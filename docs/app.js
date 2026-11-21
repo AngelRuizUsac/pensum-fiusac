@@ -74,14 +74,41 @@ function planificar() {
   const opciones = cursos.filter(c => elegible(c,s) && !s.seleccion.includes(c.id));
   $("opciones").innerHTML = opciones.map(c => tarjeta(c,true)).join("") || "<p>No hay más cursos elegibles con esta proyección.</p>";
 }
+let grafoCompleto = false;
+function grafo(c) {
+  const {niveles,aristas} = redPosterior(c.id,grafoCompleto);
+  if (!aristas.length) return '<h3>Grafo de cursos</h3><p>Este curso no es prerrequisito de otro en el pénsum.</p>';
+  const columnas = [];
+  for (const [id,nivel] of niveles) (columnas[nivel] ??= []).push(id);
+  const posiciones = new Map();
+  const alto = Math.max(...columnas.map(col => col.length))*8;
+  const ancho = columnas.length*16-2;
+  columnas.forEach((col,n) => col.forEach((id,i) => posiciones.set(id,{x:n*16,y:(alto-col.length*8)/2+i*8})));
+  const lineas = aristas.map(([a,b]) => {
+    const p = posiciones.get(a), q = posiciones.get(b);
+    const x = p.x+14, y = p.y+3.5, fin = q.y+3.5;
+    return `<path d="M ${x} ${y} C ${x+1.2} ${y}, ${q.x-1.2} ${fin}, ${q.x-.1} ${fin}" marker-end="url(#punta)"/>`;
+  }).join("");
+  const tarjetas = [...posiciones].map(([id,p]) => {
+    const curso = catalogo.get(id), st = estado(curso,s);
+    let nota = st;
+    if (id !== c.id && curso.req.includes(c.id) && st === "Bloqueado") {
+      const otros = faltantes(curso,s).filter(r => r !== c.id);
+      nota = otros.length ? "También falta: "+otros.join(", ") : "Se abre al aprobar "+c.id;
+    }
+    return `<button class="nodo estado-${normalizar(st).replace(" ","-")}" style="left:${p.x}rem;top:${p.y}rem" data-nodo="${id}" ${id===c.id ? "disabled" : ""}><small>${id} · Sem. ${curso.semester}</small><b>${curso.name}</b><small>${nota}</small></button>`;
+  }).join("");
+  return `<h3>Grafo de cursos</h3><p>Las flechas van del requisito al curso que depende de él. Selecciona una materia para explorar su ruta.</p><button data-alcance aria-pressed="${grafoCompleto}">${grafoCompleto ? "Ver solo dependencias directas" : "Ver cadena completa"}</button><div class="grafo" role="region" aria-label="Grafo de cursos posteriores" tabindex="0"><div style="width:${ancho}rem;height:${alto}rem"><svg aria-hidden="true" viewBox="0 0 ${ancho} ${alto}" preserveAspectRatio="none"><defs><marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><polygon points="0,0 10,5 0,10" fill="#596779"/></marker></defs>${lineas}</svg>${tarjetas}</div></div>`;
+}
 function detalle(id) {
+  if (abierto !== id || !$("detalle").open) grafoCompleto = false;
   abierto = id;
   const c = catalogo.get(id), st = estado(c,s);
   const enlaces = lista => lista.map(x => `<li><button class="ruta" data-curso="${x.id}">${x.id} · ${x.name}<small>${estado(x,s)}</small></button></li>`).join("");
   const directos = st === "Bloqueado" ? faltantes(c,s).map(r => catalogo.get(r)) : [];
   const previos = directos.length ? rutaPendiente(c,s).filter(x => !c.req.includes(x.id)) : [];
-  const siguientes = st === "Disponible" ? abreAlAprobar(c,s) : [];
-  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${st} · ${tipoCurso(id)}</p>${directos.length ? "<h3>Te falta aprobar</h3><ul>"+enlaces(directos)+"</ul>" : ""}${previos.length ? "<h3>Clases previas pendientes</h3><ol>"+enlaces(previos)+"</ol>" : ""}${siguientes.length ? "<h3>Al aprobarlo abres</h3><ul>"+enlaces(siguientes)+"</ul>" : ""}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
+
+  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${st} · ${tipoCurso(id)}</p>${["0799","7999"].includes(id) ? "<p>Para el cierre debes aprobar uno de los dos seminarios de investigación según tu modalidad de graduación.</p>" : ""}${directos.length ? "<h3>Te falta aprobar</h3><ul>"+enlaces(directos)+"</ul>" : ""}${previos.length ? "<h3>Clases previas pendientes</h3><ol>"+enlaces(previos)+"</ol>" : ""}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>${grafo(c)}`;
   $("detalle").setAttribute("aria-labelledby","tituloCurso");
   if (!$("detalle").open) $("detalle").showModal();
 }
@@ -123,7 +150,8 @@ document.addEventListener("click",e => {
   if (!b) return;
   const d = b.dataset;
   if (d.view) { vista = d.view; render(); }
-  if (d.curso) detalle(d.curso);
+  if (d.curso || d.nodo) detalle(d.curso || d.nodo);
+  if ("alcance" in d) { grafoCompleto = !grafoCompleto; detalle(abierto); $("contenido").querySelector("[data-alcance]").focus(); }
   if (d.estado && abierto) {
     if (d.estado === "Pendiente") delete s.estados[abierto];
     else s.estados[abierto] = d.estado;

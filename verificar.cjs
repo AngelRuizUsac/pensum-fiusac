@@ -37,6 +37,14 @@ vm.runInContext(`
   assert.ok(rutaIPC2.indexOf("0101") >= 0 && rutaIPC2.indexOf("0101") < rutaIPC2.indexOf("0107"));
   assert.equal(new Set(rutaIPC2).size,rutaIPC2.length);
   assert.equal(rutaPendiente(catalogo.get("0103"),parcial).length,0);
+  assert.equal(cursos.filter(c=>c.obligatorio).length,57);
+  assert.equal(catalogo.get("0014").obligatorio,true);
+  assert.equal(catalogo.get("0039").obligatorio,false);
+  const directos = redPosterior("0101",false), completa = redPosterior("0101",true);
+  assert.equal(directos.niveles.get("0103"),1);
+  assert.ok(!directos.niveles.has("0771") && completa.niveles.has("0771"));
+  for (const [a,b] of completa.aristas) assert.ok(catalogo.get(b).req.includes(a) && completa.niveles.get(a)<completa.niveles.get(b));
+  assert.equal(redPosterior("0014",true).aristas.length,0);
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
