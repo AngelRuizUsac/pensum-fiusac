@@ -92,6 +92,12 @@ vm.runInContext(`
     esperados.forEach(id=>perfil.estados[id]="Aprobado");
     assert.equal(calcularRuta(perfil,{...opcionesAuto,meta:"obligatorios",seminario,vacaciones}).ciclos.length,0);
   }
+  const busquedaExacta=explorarRutas({...inicial(),rango:"medio"},{...opcionesAuto,meta:"obligatorios",vacaciones:true,cupo:1});
+  let pasoExacto=busquedaExacta.next();
+  const cotaInicial=pasoExacto.value.propuesta.ciclos.length;
+  while(!pasoExacto.done) pasoExacto=busquedaExacta.next();
+  assert.ok(pasoExacto.value.minima && pasoExacto.value.ciclos.length<cotaInicial);
+  assert.equal(pasoExacto.value.ciclos.length,15);
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
