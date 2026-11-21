@@ -12,3 +12,5 @@
 .filaCiclo{display:flex;gap:.4rem;margin:.4rem 0}.filaCiclo button:first-child{flex:1;text-align:left}.filaCiclo small{display:block}.filaCiclo button[aria-pressed=true]{background:#e5efff;border-color:#3977bc}.filaCiclo button{color:#1a344b}
 
 .nodo{height:9rem}.nodo:disabled{outline:2px solid #273c52;outline-offset:-2px}.tipoNodo{font-size:.8rem;font-weight:650;color:#404956}.grafo{margin-top:12px}
+
+#configAuto label{margin:6px 6px 6px 0}#configAuto label[hidden]{display:none}#configAuto select{max-width:100%}#resultadoRuta:not(:empty){margin-top:16px}#configAuto label{max-width:100%}
