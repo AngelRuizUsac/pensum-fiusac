@@ -1,6 +1,6 @@
 "use strict";
 // Minimiza el número de períodos transcurridos para un calendario y una meta fijos.
-function calcularRuta(s, cfg, presupuestoMs = 500) {
+function* explorarRutas(s, cfg) {
   const max = limite(s);
   const aprobados = id => s.estados[id] === "Aprobado" || (s.proyectar && s.estados[id] === "En curso");
   const hasta = cfg.meta === "dia" ? s.semestre : cfg.semestre;
@@ -47,29 +47,81 @@ function calcularRuta(s, cfg, presupuestoMs = 500) {
     }
     t++;
   }
-  let mejor=asignado.slice(), minima=true;
-  const vence=Date.now()+presupuestoMs;
-  const totalCreditos=sumar(lista), mayorCredito=Math.max(...lista.map(c=>c.credits));
+
+  function resultado(solucion, longitud, minima) {
+    const ciclos = Array.from({length:longitud},(_,j)=>({
+      tipo:esVac(j)?"Vacaciones":"Semestre",
+      ids:lista.filter((_,i)=>solucion[i]===j).map(c=>c.id)
+    }));
+    return {ciclos,minima};
+  }
+  const inicialFactible = resultado(asignado,t,false);
+  let visitas=0;
   for(let horizonte=Math.max(...largo);horizonte<t;horizonte++) {
-    const plazas=Array.from({length:horizonte},(_,j)=>esVac(j)?cfg.cupo*mayorCredito:max);
-    if(plazas.reduce((a,b)=>a+b,0)<totalCreditos) continue;
-    const colocados=lista.map(()=>-1), carga=plazas.map(()=>0), cantidad=plazas.map(()=>0);
-    let vencido=false;
-    function buscar(pos) {
-      if(pos===orden.length) return true;
-      if(Date.now()>=vence){vencido=true;return false;}
-      const i=orden[pos], primero=Math.max(-1,...padres[i].map(p=>colocados[p]))+1;
-      for(let j=primero;j<=horizonte-largo[i];j++) {
-        if(esVac(j) ? cantidad[j]>=cfg.cupo : carga[j]+lista[i].credits>max) continue;
-        colocados[i]=j;cantidad[j]++;carga[j]+=lista[i].credits;
-        if(buscar(pos+1)) return true;
-        colocados[i]=-1;cantidad[j]--;carga[j]-=lista[i].credits;
-        if(vencido) return false;
+    yield {propuesta:inicialFactible,horizonte,visitas};
+    const puestos=lista.map(()=>-1);
+    const carga=Array(horizonte).fill(0), cantidad=Array(horizonte).fill(0);
+    function* buscar(restantes) {
+      if(!restantes) return true;
+      if(++visitas%64===0) yield {horizonte,visitas};
+      const desde=[], hasta=[], dominios=[];
+      function cabeEn(i,j) {
+        if(puestos[i]>=0) return puestos[i]===j;
+        return esVac(j) ? cantidad[j]<cfg.cupo : carga[j]+lista[i].credits<=max;
+      }
+      // Propaga ambos extremos por el grafo antes de elegir la materia más restringida.
+      for(let i=0;i<lista.length;i++) {
+        let j=Math.max(-1,...padres[i].map(p=>desde[p]))+1;
+        while(j<horizonte && !cabeEn(i,j)) j++;
+        if(j===horizonte) return false;
+        desde[i]=j;
+      }
+      for(let i=lista.length-1;i>=0;i--) {
+        let j=Math.min(horizonte,...hijos[i].map(h=>hasta[h]))-1;
+        while(j>=desde[i] && !cabeEn(i,j)) j--;
+        if(j<desde[i]) return false;
+        hasta[i]=j;
+      }
+      let elegido=-1;
+      for(const i of orden) {
+        if(puestos[i]>=0) continue;
+        const opciones=[];
+        for(let j=desde[i];j<=hasta[i];j++) if(cabeEn(i,j)) opciones.push(j);
+        dominios[i]=opciones;
+        if(elegido<0 || opciones.length<dominios[elegido].length) elegido=i;
+      }
+      // Descarta ventanas cuya carga obligada supera incluso su capacidad más favorable.
+      for(let a=0;a<horizonte;a++) {
+        let capacidad=0;
+        for(let b=a;b<horizonte;b++) {
+          if(esVac(b)) {
+            const pesos=lista.filter((c,i)=>puestos[i]<0 && dominios[i].includes(b)).map(c=>c.credits).sort((u,v)=>v-u);
+            capacidad+=pesos.slice(0,cfg.cupo-cantidad[b]).reduce((n,k)=>n+k,0);
+          } else capacidad+=max-carga[b];
+          let exigida=0;
+          for(let i=0;i<lista.length;i++) if(puestos[i]<0 && desde[i]>=a && hasta[i]<=b) exigida+=lista[i].credits;
+          if(exigida>capacidad) return false;
+        }
+      }
+      for(const j of dominios[elegido]) {
+        puestos[elegido]=j; cantidad[j]++; carga[j]+=lista[elegido].credits;
+        if(yield* buscar(restantes-1)) return true;
+        puestos[elegido]=-1; cantidad[j]--; carga[j]-=lista[elegido].credits;
       }
       return false;
     }
-    if(buscar(0)){mejor=colocados;t=horizonte;break;}
-    if(vencido){minima=false;break;}
+    if(yield* buscar(lista.length)) return resultado(puestos,horizonte,true);
   }
-  return {minima,ciclos:Array.from({length:t},(_,j)=>({tipo:esVac(j)?"Vacaciones":"Semestre",ids:lista.filter((_,i)=>mejor[i]===j).map(c=>c.id)}))};
+  return resultado(asignado,t,true);
+}
+// Para verificaciones síncronas. La interfaz consume el generador en segundo plano.
+function calcularRuta(s,cfg,presupuestoMs=Infinity) {
+  const busqueda=explorarRutas(s,cfg), fin=Date.now()+presupuestoMs;
+  let mejor;
+  while(true) {
+    const paso=busqueda.next();
+    if(paso.done) return paso.value;
+    if(paso.value.propuesta) mejor=paso.value.propuesta;
+    if(mejor && Date.now()>=fin) return mejor;
+  }
 }
