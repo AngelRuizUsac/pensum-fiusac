@@ -33,6 +33,10 @@ vm.runInContext(`
   const parcial = {...s,estados:{"0101":"Aprobado"}};
   assert.equal(estado(catalogo.get("0103"),parcial),"Disponible");
   assert.equal(estado(catalogo.get("0103"),{...parcial,semestre:10}),"Disponible");
+  const rutaIPC2 = rutaPendiente(catalogo.get("0771"),s).map(c => c.id);
+  assert.ok(rutaIPC2.indexOf("0101") >= 0 && rutaIPC2.indexOf("0101") < rutaIPC2.indexOf("0107"));
+  assert.equal(new Set(rutaIPC2).size,rutaIPC2.length);
+  assert.equal(rutaPendiente(catalogo.get("0103"),parcial).length,0);
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";

@@ -40,3 +40,17 @@ function abreAlAprobar(c, s) {
   return cursos.filter(x => !s.estados[x.id] && x.req.includes(c.id) &&
     faltantes(x,s).length === 1 && faltantes(x,s)[0] === c.id);
 }
+
+function rutaPendiente(c, s) {
+  const vistos = new Set();
+  const ruta = [];
+  function visitar(id) {
+    if (vistos.has(id) || s.estados[id] === "Aprobado") return;
+    vistos.add(id);
+    const requisito = catalogo.get(id);
+    requisito.req.forEach(visitar);
+    ruta.push(requisito);
+  }
+  c.req.forEach(visitar);
+  return ruta;
+}
