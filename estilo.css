@@ -5,3 +5,6 @@
 .requisitos{display:grid;gap:6px;border-top:1px solid var(--edge);padding-top:8px;width:100%;font-size:.84rem;line-height:1.45}.req-ok,.req-falta{font-weight:650;font-style:normal}.req-ok{color:#21673f}.req-falta{color:#875524}dialog ol{padding-left:24px}
 
 .malla{display:flex;gap:12px;overflow-x:auto;padding:14px 2px 22px}.malla section{flex:0 0 235px}.malla h3{margin-bottom:12px}.malla .card{width:100%;margin-bottom:8px}.tipo{font-weight:600;color:#4b5864}.inner details{background:#fafcfb}
+
+.estado-disponible{border-left-color:#3174bc}.pill.disponible{background:#e4efff;color:#204d83}.estado-en-curso{border-left-color:#805ab0}.pill.en-curso{background:#f0e9fd;color:#603a91}.impacto{color:#284f7b}
+#detalle{width:min(58rem,95vw)}.grafo{overflow:auto;max-height:48vh;margin:12px 0 0;background:#f8fafc;border:1px solid #d8e1e6;border-radius:10px;padding:12px}.grafo>div{position:relative}.grafo svg{position:absolute;width:100%;height:100%;pointer-events:none}.grafo path{fill:none;stroke:#697b8a;stroke-width:.1}.nodo{position:absolute;width:14rem;height:7rem;padding:.45rem .65rem;display:grid;align-content:center;gap:.18rem;text-align:left;line-height:1.16;background:#fff}.nodo small{font-size:.78rem}.nodo:disabled{opacity:1;cursor:default;outline:1px solid #536370}
