@@ -21,12 +21,25 @@ function guardar() {
 }
 function tarjeta(c, paraPlan = false) {
   const st = estado(c,s);
-  const etiqueta = paraPlan ? (s.seleccion.includes(c.id) ? "En mi selección" : faltantes(c,s).length ? "Condicional · añadir" : "Añadir al plan") : st;
-  return `<button class="card" data-${paraPlan ? "elegir" : "curso"}="${c.id}"><span class="meta">${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span></button>`;
+  const falta = faltantes(c,s);
+  const abre = abreAlAprobar(c,s).length;
+  const limitado = paraPlan && !cabe(c,s);
+  const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : falta.length ? "Condicional · añadir" : "Añadir al plan") : st;
+  const pista = st === "Bloqueado" ? "Falta aprobar: "+falta.map(id => catalogo.get(id).name).join(", ") : "";
+  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista ? "<small>"+pista+"</small>" : ""}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
 }
 function mapa() {
   const q = normalizar($("buscar").value.trim()), f = $("filtro").value;
   const visibles = cursos.filter(c => normalizar(c.name+" "+c.id).includes(q) && (!f || estado(c,s) === f));
+  if ($("orden").value === "estado") {
+    const titulos = {Disponible:"Disponibles ahora", "En curso":"En curso", Bloqueado:"Bloqueados por prerrequisitos", Aprobado:"Aprobados"};
+    $("grupos").innerHTML = Object.entries(titulos).map(([st,titulo]) => {
+      const lista = visibles.filter(c => estado(c,s) === st);
+      if (!lista.length) return "";
+      return `<details ${st === "Disponible" || q || f ? "open" : ""}><summary>${titulo}<small>${lista.length}</small></summary><div class="grid inner">${lista.map(c => tarjeta(c)).join("")}</div></details>`;
+    }).join("") || "<p>Ningún curso coincide con la búsqueda.</p>";
+    return;
+  }
   $("grupos").innerHTML = semestres.map(n => {
     const lista = visibles.filter(c => c.semester === n);
     if (!lista.length) return "";
@@ -36,8 +49,9 @@ function mapa() {
 function planificar() {
   const lista = s.seleccion.map(id => catalogo.get(id));
   const carga = sumar(lista);
-  $("seleccion").innerHTML = `<p>${lista.length} cursos · ${carga} CLAR / referencia de 30</p>` +
-    (carga > 30 ? '<p class="warning">Tu selección supera la carga de referencia de 30 CLAR.</p>' : "") +
+  const max = limite(s);
+  const saldo = max === null ? "Elige el rango de tu promedio para añadir cursos." : carga > max ? "Exceso de "+(carga-max)+" CLAR. Quita cursos para ajustar tu plan." : "Te quedan "+(max-carga)+" CLAR.";
+  $("seleccion").innerHTML = `<p><strong>${carga}${max === null ? "" : " / "+max} CLAR</strong> · ${lista.length} cursos</p><p class="${max !== null && carga > max ? "warning" : ""}">${saldo}</p>` +
     lista.map(c => `<div class="choice"><span><b>${c.name}</b> · ${c.credits} CLAR<br><small>${!elegible(c,s) ? "Revisar requisitos o estado" : faltantes(c,s).length ? "Depende de aprobar "+faltantes(c,s).join(", ") : "Requisitos cumplidos"}</small></span><button data-quitar="${c.id}" aria-label="Quitar ${c.name}">Quitar</button></div>`).join("");
   const opciones = cursos.filter(c => elegible(c,s) && !s.seleccion.includes(c.id));
   $("opciones").innerHTML = opciones.map(c => tarjeta(c,true)).join("") || "<p>No hay más cursos elegibles con esta proyección.</p>";
@@ -45,12 +59,19 @@ function planificar() {
 function detalle(id) {
   abierto = id;
   const c = catalogo.get(id), siguientes = cursos.filter(x => x.req.includes(id));
-  const nombres = (lista, conEstado) => lista.map(x => `<li>${x.id} · ${x.name}${conEstado ? " — "+estado(x,s) : ""}</li>`).join("");
+  const nombres = (lista, conEstado) => lista.map(x => {
+    const otros = faltantes(x,s).filter(r => r !== id);
+    const abre = abreAlAprobar(c,s).some(curso => curso.id === x.id);
+    const nota = conEstado || s.estados[x.id] ? estado(x,s) : abre ? "Se abre al aprobar este curso" : otros.length ? "También requiere aprobar "+otros.map(r => catalogo.get(r).name).join(", ") : estado(x,s);
+    return `<li><button class="ruta" data-curso="${x.id}">${x.name} · ${x.id}<small>${nota}</small></button></li>`;
+  }).join("");
   $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${estado(c,s)}</p><h3>Prerrequisitos</h3>${c.req.length ? "<ul>"+nombres(c.req.map(r => catalogo.get(r)),true)+"</ul>" : "<p>Ingreso libre según la red.</p>"}<h3>Es requisito para</h3>${siguientes.length ? "<ul>"+nombres(siguientes,false)+"</ul>" : "<p>Sin cursos posteriores vinculados.</p>"}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
   $("detalle").setAttribute("aria-labelledby","tituloCurso");
   if (!$("detalle").open) $("detalle").showModal();
 }
 function render() {
+  $("rango").value = s.rango;
+  $("doble").checked = s.doble;
   $("actual").value = s.semestre;
   $("proyectar").checked = s.proyectar;
   const aprobados = cursos.filter(c => s.estados[c.id] === "Aprobado");
@@ -68,6 +89,9 @@ function render() {
 }
 $("actual").innerHTML = semestres.map(n => `<option value="${n}">${n}.</option>`).join("");
 $("actual").onchange = () => { s.semestre = Number($("actual").value); expandidos.clear(); expandidos.add(s.semestre); guardar(); };
+$("orden").onchange = mapa;
+$("rango").onchange = () => { s.rango = $("rango").value; guardar(); };
+$("doble").onchange = () => { s.doble = $("doble").checked; guardar(); };
 $("buscar").oninput = mapa;
 $("filtro").onchange = mapa;
 $("proyectar").onchange = () => { s.proyectar = $("proyectar").checked; guardar(); };
@@ -90,7 +114,7 @@ document.addEventListener("click",e => {
     s.seleccion = s.seleccion.filter(id => !s.estados[id]);
     guardar(); detalle(abierto);
   }
-  if (d.elegir && elegible(catalogo.get(d.elegir),s) && !s.seleccion.includes(d.elegir)) {
+  if (d.elegir && elegible(catalogo.get(d.elegir),s) && cabe(catalogo.get(d.elegir),s) && !s.seleccion.includes(d.elegir)) {
     s.seleccion.push(d.elegir); guardar();
   }
   if (d.quitar) { s.seleccion = s.seleccion.filter(id => id !== d.quitar); guardar(); }
