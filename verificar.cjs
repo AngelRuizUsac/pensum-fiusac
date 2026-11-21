@@ -3,7 +3,7 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const entorno = vm.createContext({assert});
-for (const nombre of ["cursos","motor"]) {
+for (const nombre of ["cursos","motor","rutas","laboratorios"]) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,"docs",nombre+".js"),"utf8"),entorno);
 }
 vm.runInContext(`
@@ -63,6 +63,27 @@ vm.runInContext(`
   assert.ok(redDelCurso("0014").niveles.has("0732"));
   assert.equal(redDelCurso("0014","pensum").niveles.size,cursos.length);
   for (const [a,b] of rutaFisica.aristas) assert.ok(catalogo.get(b).req.includes(a) && rutaFisica.niveles.get(a)<rutaFisica.niveles.get(b));
+  assert.equal(laboratorios.size,27);
+  for (const [id,fuente] of laboratorios) assert.ok(catalogo.has(id) && fuente.url.startsWith("https://"));
+  const perfilAuto = {...inicial(),rango:"bajo"};
+  const opcionesAuto = {meta:"curso",curso:"0107",vacaciones:false,cupo:1,seminario:"0799",semestre:4};
+  const rapida = calcularRuta(perfilAuto,opcionesAuto);
+  assert.equal(rapida.minima,true);
+  assert.deepEqual(rapida.ciclos.map(c=>c.ids),[["0101"],["0103"],["0107"]]);
+  for (const meta of ["curso","dia","semestre","todo"]) for (const vacaciones of [true,false]) {
+    const cfg = {...opcionesAuto,meta,vacaciones};
+    const ruta = calcularRuta(perfilAuto,cfg,25);
+    const hechos = new Set();
+    for (const ciclo of ruta.ciclos) {
+      if (ciclo.tipo==="Vacaciones") assert.ok(vacaciones && ciclo.ids.length<=cfg.cupo);
+      else assert.ok(sumar(ciclo.ids.map(id=>catalogo.get(id)))<=32);
+      for(const id of ciclo.ids) assert.ok(!hechos.has(id) && catalogo.get(id).req.every(p=>hechos.has(p)));
+      ciclo.ids.forEach(id=>hechos.add(id));
+    }
+    if(meta==="todo") assert.equal(hechos.size,74);
+  }
+  assert.throws(()=>calcularRuta({...perfilAuto,estados:{"0101":"En curso"}},opcionesAuto));
+  assert.deepEqual(calcularRuta({...perfilAuto,estados:{"0107":"Aprobado"}},opcionesAuto).ciclos,[]);
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
