@@ -19,12 +19,13 @@ function guardar() {
   catch { avisar("Este navegador no pudo guardar el avance. Exporta un respaldo antes de salir."); }
   render();
 }
-function tarjeta(c, paraPlan = false) {
-  const st = estado(c,s);
-  const falta = faltantes(c,s);
-  const abre = st === "Disponible" ? abreAlAprobar(c,s).length : 0;
-  const limitado = paraPlan && !cabe(c,s);
-  const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : falta.length ? "Condicional · añadir" : "Añadir al plan") : st;
+function tarjeta(c, paraPlan = false, contexto = s, esVacaciones = false) {
+  const st = estado(c,contexto);
+  const falta = faltantes(c,contexto);
+  const dependeDePlan = paraPlan && c.req.some(id => s.estados[id] !== "Aprobado");
+  const abre = !paraPlan && st === "Disponible" ? abreAlAprobar(c,s).length : 0;
+  const limitado = paraPlan && !esVacaciones && !cabe(c,contexto);
+  const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : dependeDePlan ? "Condicional · añadir" : "Añadir al plan") : st;
   const pista = st === "Bloqueado" ? '<span class="requisitos"><b>Necesitas aprobar</b>'+falta.map(id => {
     const req = catalogo.get(id);
     const registro = s.estados[id] || "Pendiente";
@@ -64,15 +65,24 @@ function mapa() {
     return `<details data-sem="${n}" ${q || f || expandidos.has(n) ? "open" : ""}><summary>Semestre ${n}<small>${lista.length} cursos</small></summary><div class="grid inner">${lista.map(c => tarjeta(c)).join("")}</div></details>`;
   }).join("") || "<p>Ningún curso coincide con la búsqueda.</p>";
 }
+let cicloActivo = 1;
 function planificar() {
-  const lista = s.seleccion.map(id => catalogo.get(id));
-  const carga = sumar(lista);
-  const max = limite(s);
-  const saldo = max === null ? "Elige el rango de tu promedio para añadir cursos." : carga > max ? "Exceso de "+(carga-max)+" CLAR. Quita cursos para ajustar tu plan." : "Te quedan "+(max-carga)+" CLAR.";
-  $("seleccion").innerHTML = `<p><strong>${carga}${max === null ? "" : " / "+max} CLAR</strong> · ${lista.length} cursos</p><p class="${max !== null && carga > max ? "warning" : ""}">${saldo}</p>` +
-    lista.map(c => `<div class="choice"><span><b>${c.name}</b> · ${c.credits} CLAR<br><small>${!elegible(c,s) ? "Revisar requisitos o estado" : faltantes(c,s).length ? "Depende de aprobar "+faltantes(c,s).join(", ") : "Requisitos cumplidos"}</small></span><button data-quitar="${c.id}" aria-label="Quitar ${c.name}">Quitar</button></div>`).join("");
-  const opciones = cursos.filter(c => elegible(c,s) && !s.seleccion.includes(c.id));
-  $("opciones").innerHTML = opciones.map(c => tarjeta(c,true)).join("") || "<p>No hay más cursos elegibles con esta proyección.</p>";
+  const ciclos = evaluarCiclos(s);
+  cicloActivo = Math.min(cicloActivo,ciclos.length-1);
+  const actual = ciclos[cicloActivo], vac = actual.tipo === "Vacaciones";
+  $("cronograma").innerHTML = ciclos.map((c,i) => {
+    const cursosPlan = c.ids.map(id => catalogo.get(id).name + (c.validos.includes(id) ? "" : " (revisar)")).join(" · ");
+    return `<div class="filaCiclo"><button data-ciclo="${i}" aria-pressed="${i === cicloActivo}"><b>${i+1}. ${c.tipo}</b> · ${c.carga} CLAR<small>${cursosPlan || "Sin cursos seleccionados"}</small></button>${i>=2 ? '<button data-borrar-ciclo="'+i+'" aria-label="Eliminar ciclo '+(i+1)+'">Eliminar</button>' : ""}</div>`;
+  }).join("") + "<p><b>Total del plan: "+ciclos.reduce((n,c)=>n+c.carga,0)+" CLAR</b></p>";
+  $("perfilCarga").hidden = vac;
+  $("seleccion").innerHTML = `<h3>Ciclo ${cicloActivo+1} · ${actual.tipo}</h3><p>${actual.carga} CLAR${vac ? " · Confirma la oferta, horas y carga permitida en la convocatoria de vacaciones." : actual.max === null ? " · Elige tu rango de promedio." : " de "+actual.max+" · Saldo: "+(actual.max-actual.carga)+" CLAR"}</p>` +
+    actual.ids.map(id => {
+      const c = catalogo.get(id), falta = faltantes(c,actual.previo,s.proyectar);
+      const nota = actual.validos.includes(id) ? "Incluido en la proyección" : falta.length ? "Falta aprobar: "+falta.map(r=>catalogo.get(r).name).join(", ") : "Revisa el estado del curso o el límite de carga";
+      return `<div class="choice"><span><b>${c.name}</b> · ${c.credits} CLAR<br><small>${nota}</small></span><button data-quitar="${id}">Quitar</button></div>`;
+    }).join("");
+  const usados = new Set(ciclos.flatMap(c=>c.ids));
+  $("opciones").innerHTML = cursos.filter(c=>!usados.has(c.id) && elegible(c,actual.previo)).map(c=>tarjeta(c,true,actual.previo,vac)).join("") || "<p>No hay más cursos elegibles en este ciclo.</p>";
 }
 let grafoCompleto = false;
 function grafo(c) {
@@ -155,13 +165,37 @@ document.addEventListener("click",e => {
   if (d.estado && abierto) {
     if (d.estado === "Pendiente") delete s.estados[abierto];
     else s.estados[abierto] = d.estado;
-    s.seleccion = s.seleccion.filter(id => !s.estados[id]);
+    for (const ciclo of ciclosDe(s)) {
+      const i = ciclo.ids.indexOf(abierto);
+      if (i >= 0 && s.estados[abierto]) ciclo.ids.splice(i,1);
+    }
     guardar(); detalle(abierto);
   }
-  if (d.elegir && elegible(catalogo.get(d.elegir),s) && cabe(catalogo.get(d.elegir),s) && !s.seleccion.includes(d.elegir)) {
-    s.seleccion.push(d.elegir); guardar();
+  if (d.ciclo !== undefined) { cicloActivo = Number(d.ciclo); planificar(); }
+  if (d.nuevo) {
+    s.posteriores.push({tipo:d.nuevo,ids:[]});
+    cicloActivo = ciclosDe(s).length-1;
+    guardar();
   }
-  if (d.quitar) { s.seleccion = s.seleccion.filter(id => id !== d.quitar); guardar(); }
+  if (d.borrarCiclo !== undefined) {
+    const i = Number(d.borrarCiclo);
+    if (!s.posteriores[i-2].ids.length || confirm("¿Eliminar este ciclo y su selección?")) {
+      s.posteriores.splice(i-2,1);
+      if (i <= cicloActivo) cicloActivo--;
+      guardar();
+    }
+  }
+  if (d.elegir) {
+    const ciclos = evaluarCiclos(s), ciclo = ciclos[cicloActivo], c = catalogo.get(d.elegir);
+    if (elegible(c,ciclo.previo) && !ciclos.some(x => x.ids.includes(c.id)) && (ciclo.tipo === "Vacaciones" || cabe(c,ciclo.previo))) {
+      ciclo.ids.push(c.id); guardar();
+    }
+  }
+  if (d.quitar) {
+    const ids = ciclosDe(s)[cicloActivo].ids, i = ids.indexOf(d.quitar);
+    if (i >= 0) ids.splice(i,1);
+    guardar();
+  }
 });
 $("exportar").onclick = () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(s,null,2)],{type:"application/json"}));
