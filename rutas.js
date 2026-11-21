@@ -11,6 +11,7 @@ function calcularRuta(s, cfg, presupuestoMs = 500) {
     case "curso": meta = [cfg.curso]; break;
     case "dia": meta = obligatorios.filter(c => c.semester <= hasta).map(c=>c.id); break;
     case "semestre": meta = obligatorios.filter(c => c.semester === hasta && !aprobados(c.id)).flatMap(c=>c.req); break;
+    case "obligatorios": meta = obligatorios.map(c=>c.id); break;
     case "todo": meta = cursos.filter(modalidad).map(c=>c.id); break;
     default: throw Error("Selecciona una meta.");
   }
