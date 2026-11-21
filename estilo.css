@@ -8,3 +8,5 @@
 
 .estado-disponible{border-left-color:#3174bc}.pill.disponible{background:#e4efff;color:#204d83}.estado-en-curso{border-left-color:#805ab0}.pill.en-curso{background:#f0e9fd;color:#603a91}.impacto{color:#284f7b}
 #detalle{width:min(58rem,95vw)}.grafo{overflow:auto;max-height:48vh;margin:12px 0 0;background:#f8fafc;border:1px solid #d8e1e6;border-radius:10px;padding:12px}.grafo>div{position:relative}.grafo svg{position:absolute;width:100%;height:100%;pointer-events:none}.grafo path{fill:none;stroke:#697b8a;stroke-width:.1}.nodo{position:absolute;width:14rem;height:7rem;padding:.45rem .65rem;display:grid;align-content:center;gap:.18rem;text-align:left;line-height:1.16;background:#fff}.nodo small{font-size:.78rem}.nodo:disabled{opacity:1;cursor:default;outline:1px solid #536370}
+
+.filaCiclo{display:flex;gap:.4rem;margin:.4rem 0}.filaCiclo button:first-child{flex:1;text-align:left}.filaCiclo small{display:block}.filaCiclo button[aria-pressed=true]{background:#e5efff;border-color:#3977bc}.filaCiclo button{color:#1a344b}

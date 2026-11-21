@@ -2,7 +2,7 @@
 const planId = "fiusac-sistemas-28-clar";
 const catalogo = new Map(cursos.map(c => [c.id, c]));
 function inicial() {
-  return {plan: planId, version: 1, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], proyectar: false};
+  return {plan: planId, version: 1, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], vacaciones: [], posteriores: [], proyectar: false};
 }
 function validar(s) {
   const estadosValidos = ["Aprobado", "En curso"];
@@ -13,7 +13,12 @@ function validar(s) {
       !Array.isArray(s.seleccion) || !s.seleccion.every(id => catalogo.has(id)) ||
       new Set(s.seleccion).size !== s.seleccion.length) throw Error("Respaldo incompatible con este pénsum.");
   if (s.rango !== undefined && !["","bajo","medio","alto"].includes(s.rango) || s.doble !== undefined && typeof s.doble !== "boolean") throw Error("Perfil académico inválido.");
-  return {...inicial(), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
+  const vacaciones = s.vacaciones ?? [], posteriores = s.posteriores ?? [];
+  const listaValida = ids => Array.isArray(ids) && ids.every(id => catalogo.has(id)) && new Set(ids).size === ids.length;
+  if (!listaValida(vacaciones) || !Array.isArray(posteriores) || !posteriores.every(c => c && ["Semestre","Vacaciones"].includes(c.tipo) && listaValida(c.ids))) throw Error("Ciclos incompatibles.");
+  const idsPlan = [...vacaciones,...s.seleccion,...posteriores.flatMap(c => c.ids)];
+  if (new Set(idsPlan).size !== idsPlan.length) throw Error("Curso repetido en el plan.");
+  return {...inicial(), vacaciones:[...vacaciones], posteriores:posteriores.map(c => ({tipo:c.tipo,ids:[...c.ids]})), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
 }
 function faltantes(c, s, proyectar = false) {
   return c.req.filter(id => s.estados[id] !== "Aprobado" && !(proyectar && s.estados[id] === "En curso"));
@@ -70,4 +75,20 @@ function redPosterior(id, completa) {
     for (const p of padres) aristas.push([p,c.id]);
   }
   return {niveles,aristas};
+}
+
+function ciclosDe(s) {
+  return [{tipo:"Vacaciones",ids:s.vacaciones},{tipo:"Semestre",ids:s.seleccion},...s.posteriores];
+}
+function evaluarCiclos(s) {
+  const simulacion = {...s,estados:{...s.estados}};
+  return ciclosDe(s).map(ciclo => {
+    const previo = {...simulacion,estados:{...simulacion.estados},seleccion:ciclo.ids};
+    const carga = sumar(ciclo.ids.map(id=>catalogo.get(id)));
+    const max = ciclo.tipo === "Semestre" ? limite(s) : null;
+    const admisible = ciclo.tipo === "Vacaciones" || (max !== null && carga <= max);
+    const validos = ciclo.ids.filter(id => admisible && elegible(catalogo.get(id),previo));
+    validos.forEach(id => simulacion.estados[id] = "Aprobado");
+    return {...ciclo, previo, carga, max, validos};
+  });
 }
