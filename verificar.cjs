@@ -15,6 +15,24 @@ vm.runInContext(`
     for (const id of c.req) assert.ok(catalogo.get(id).semester < c.semester);
   }
   const s = inicial();
+  const legado = inicial(); delete legado.rango; delete legado.doble;
+  assert.equal(validar(legado).rango,"");
+  assert.equal(limite(s),null);
+  for (const [rango,max] of [["bajo",32],["medio",37],["alto",42]]) {
+    assert.equal(limite({...s,rango}),max);
+    assert.equal(limite({...s,rango,doble:true}),max+5);
+  }
+  const candidato = catalogo.get("0101");
+  const carga = {...s,rango:"bajo",seleccion:["0103","0107","0147"]};
+  assert.equal(cabe(candidato,carga),true);
+  carga.seleccion.push("0005");
+  assert.equal(cabe(candidato,carga),false);
+  assert.equal(cabe(candidato,s),false);
+  assert.ok(abreAlAprobar(candidato,s).some(c => c.id === "0103"));
+  assert.ok(!abreAlAprobar(candidato,s).some(c => c.id === "0771"));
+  const parcial = {...s,estados:{"0101":"Aprobado"}};
+  assert.equal(estado(catalogo.get("0103"),parcial),"Disponible");
+  assert.equal(estado(catalogo.get("0103"),{...parcial,semestre:10}),"Disponible");
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
