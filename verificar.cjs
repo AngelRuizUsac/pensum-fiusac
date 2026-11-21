@@ -84,6 +84,14 @@ vm.runInContext(`
   }
   assert.throws(()=>calcularRuta({...perfilAuto,estados:{"0101":"En curso"}},opcionesAuto));
   assert.deepEqual(calcularRuta({...perfilAuto,estados:{"0107":"Aprobado"}},opcionesAuto).ciclos,[]);
+  for(const seminario of ["0799","7999"]) for(const vacaciones of [true,false]) {
+    const perfil={...perfilAuto,estados:{"0101":"Aprobado"}};
+    const ruta=calcularRuta(perfil,{...opcionesAuto,meta:"obligatorios",seminario,vacaciones},25);
+    const esperados=cursos.filter(c=>c.id!=="0101" && (c.id===seminario || (c.obligatorio && c.id!=="0799"))).map(c=>c.id);
+    assert.deepEqual(ruta.ciclos.flatMap(c=>c.ids).sort(),esperados.sort());
+    esperados.forEach(id=>perfil.estados[id]="Aprobado");
+    assert.equal(calcularRuta(perfil,{...opcionesAuto,meta:"obligatorios",seminario,vacaciones}).ciclos.length,0);
+  }
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
