@@ -22,24 +22,38 @@ function guardar() {
 function tarjeta(c, paraPlan = false) {
   const st = estado(c,s);
   const falta = faltantes(c,s);
-  const abre = abreAlAprobar(c,s).length;
+  const abre = st === "Disponible" ? abreAlAprobar(c,s).length : 0;
   const limitado = paraPlan && !cabe(c,s);
   const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : falta.length ? "Condicional · añadir" : "Añadir al plan") : st;
-  const pista = c.req.length ? '<span class="requisitos"><b>Necesitas aprobar</b>'+c.req.map(id => {
+  const pista = st === "Bloqueado" ? '<span class="requisitos"><b>Necesitas aprobar</b>'+falta.map(id => {
     const req = catalogo.get(id);
     const registro = s.estados[id] || "Pendiente";
     return '<span><em class="req-'+(registro === "Aprobado" ? "ok" : "falta")+'">'+registro+'</em> '+req.id+' · '+req.name+'</span>';
-  }).join("")+'</span>' : '<small>Sin prerrequisitos</small>';
-  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
+  }).join("")+'</span>' : "";
+  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><small class="tipo">${tipoCurso(c.id)}</small><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
 }
 function mapa() {
   const q = normalizar($("buscar").value.trim()), f = $("filtro").value;
   const visibles = cursos.filter(c => normalizar(c.name+" "+c.id).includes(q) && (!f || estado(c,s) === f));
+  function porSemestre(lista, malla = false) {
+    return semestres.map(n => {
+      const grupo = lista.filter(c => c.semester === n);
+      if (!grupo.length) return "";
+      const tarjetas = grupo.map(c => tarjeta(c)).join("");
+      return malla ? `<section><h3>Semestre ${n}</h3>${tarjetas}</section>` :
+        `<details ${q || f ? "open" : ""}><summary>Semestre ${n}<small>${grupo.length} cursos</small></summary><div class="grid inner">${tarjetas}</div></details>`;
+    }).join("");
+  }
+  if ($("orden").value === "malla" && visibles.length) {
+    $("grupos").innerHTML = '<div class="malla" tabindex="0" aria-label="Malla de cursos por semestre">'+porSemestre(visibles,true)+'</div>';
+    return;
+  }
   if ($("orden").value === "estado") {
     const titulos = {Disponible:"Disponibles ahora", "En curso":"En curso", Bloqueado:"Bloqueados por prerrequisitos", Aprobado:"Aprobados"};
     $("grupos").innerHTML = Object.entries(titulos).map(([st,titulo]) => {
       const lista = visibles.filter(c => estado(c,s) === st);
       if (!lista.length) return "";
+      if (st === "Bloqueado") return `<details ${q || f ? "open" : ""}><summary>${titulo}<small>${lista.length}</small></summary><div class="inner">${porSemestre(lista)}</div></details>`;
       return `<details ${st === "Disponible" || q || f ? "open" : ""}><summary>${titulo}<small>${lista.length}</small></summary><div class="grid inner">${lista.map(c => tarjeta(c)).join("")}</div></details>`;
     }).join("") || "<p>Ningún curso coincide con la búsqueda.</p>";
     return;
@@ -62,19 +76,12 @@ function planificar() {
 }
 function detalle(id) {
   abierto = id;
-  const c = catalogo.get(id), siguientes = cursos.filter(x => x.req.includes(id));
-  const nombres = (lista, conEstado) => lista.map(x => {
-    const otros = faltantes(x,s).filter(r => r !== id);
-    const abre = abreAlAprobar(c,s).some(curso => curso.id === x.id);
-    const nota = conEstado ? (s.estados[x.id] || (estado(x,s) === "Disponible" ? "Pendiente · disponible para cursar" : "Pendiente · tiene prerrequisitos")) : s.estados[x.id] ? estado(x,s) : abre ? "Se abre al aprobar este curso" : otros.length ? "También requiere aprobar "+otros.map(r => catalogo.get(r).name).join(", ") : estado(x,s);
-    return `<li><button class="ruta" data-curso="${x.id}">${x.name} · ${x.id}<small>${nota}</small></button></li>`;
-  }).join("");
-  const ruta = rutaPendiente(c,s);
-  const previos = ruta.filter(x => !c.req.includes(x.id));
-  const listaPrevia = previos.length ? '<h3>Clases previas que también te faltan</h3><p>En orden de prerrequisitos. Selecciona una clase para seguir su ruta.</p><ol>'+nombres(previos,true)+'</ol>' : "";
-  const pendientes = faltantes(c,s).length;
-  const resumen = c.req.length ? (pendientes ? "Te falta aprobar "+pendientes+" de "+c.req.length+" requisitos directos." : "Ya aprobaste todos los requisitos directos.") : "";
-  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${estado(c,s)}</p><h3>Clases que necesitas para llevarla</h3><p>${resumen}</p>${c.req.length ? "<ul>"+nombres(c.req.map(r => catalogo.get(r)),true)+"</ul>" : "<p>Ingreso libre según la red.</p>"}${listaPrevia}<h3>Es requisito para</h3>${siguientes.length ? "<ul>"+nombres(siguientes,false)+"</ul>" : "<p>Sin cursos posteriores vinculados.</p>"}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
+  const c = catalogo.get(id), st = estado(c,s);
+  const enlaces = lista => lista.map(x => `<li><button class="ruta" data-curso="${x.id}">${x.id} · ${x.name}<small>${estado(x,s)}</small></button></li>`).join("");
+  const directos = st === "Bloqueado" ? faltantes(c,s).map(r => catalogo.get(r)) : [];
+  const previos = directos.length ? rutaPendiente(c,s).filter(x => !c.req.includes(x.id)) : [];
+  const siguientes = st === "Disponible" ? abreAlAprobar(c,s) : [];
+  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${st} · ${tipoCurso(id)}</p>${directos.length ? "<h3>Te falta aprobar</h3><ul>"+enlaces(directos)+"</ul>" : ""}${previos.length ? "<h3>Clases previas pendientes</h3><ol>"+enlaces(previos)+"</ol>" : ""}${siguientes.length ? "<h3>Al aprobarlo abres</h3><ul>"+enlaces(siguientes)+"</ul>" : ""}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
   $("detalle").setAttribute("aria-labelledby","tituloCurso");
   if (!$("detalle").open) $("detalle").showModal();
 }
