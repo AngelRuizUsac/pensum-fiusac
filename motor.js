@@ -92,3 +92,23 @@ function evaluarCiclos(s) {
     return {...ciclo, previo, carga, max, validos};
   });
 }
+
+function redDelCurso(id, modo = "ruta") {
+  const visibles = new Set(redPosterior(id, modo !== "directa").niveles.keys());
+  if (modo === "pensum") {
+    cursos.forEach(c => visibles.add(c.id));
+  } else if (modo === "directa") {
+    catalogo.get(id).req.forEach(p => visibles.add(p));
+  } else {
+    // Incluye también las ramas que convergen en un curso posterior.
+    for (const c of [...cursos].reverse()) {
+      if (visibles.has(c.id)) c.req.forEach(p => visibles.add(p));
+    }
+  }
+  const lista = cursos.filter(c => visibles.has(c.id));
+  const semestresVisibles = [...new Set(lista.map(c => c.semester))];
+  const niveles = new Map(lista.map(c => [c.id,semestresVisibles.indexOf(c.semester)]));
+  const aristas = lista.flatMap(c => c.req.filter(p => visibles.has(p) &&
+    (modo !== "directa" || c.id === id || p === id)).map(p => [p,c.id]));
+  return {niveles,aristas};
+}

@@ -10,3 +10,5 @@
 #detalle{width:min(58rem,95vw)}.grafo{overflow:auto;max-height:48vh;margin:12px 0 0;background:#f8fafc;border:1px solid #d8e1e6;border-radius:10px;padding:12px}.grafo>div{position:relative}.grafo svg{position:absolute;width:100%;height:100%;pointer-events:none}.grafo path{fill:none;stroke:#697b8a;stroke-width:.1}.nodo{position:absolute;width:14rem;height:7rem;padding:.45rem .65rem;display:grid;align-content:center;gap:.18rem;text-align:left;line-height:1.16;background:#fff}.nodo small{font-size:.78rem}.nodo:disabled{opacity:1;cursor:default;outline:1px solid #536370}
 
 .filaCiclo{display:flex;gap:.4rem;margin:.4rem 0}.filaCiclo button:first-child{flex:1;text-align:left}.filaCiclo small{display:block}.filaCiclo button[aria-pressed=true]{background:#e5efff;border-color:#3977bc}.filaCiclo button{color:#1a344b}
+
+.nodo{height:9rem}.nodo:disabled{outline:2px solid #273c52;outline-offset:-2px}.tipoNodo{font-size:.8rem;font-weight:650;color:#404956}.grafo{margin-top:12px}
