@@ -25,8 +25,12 @@ function tarjeta(c, paraPlan = false) {
   const abre = abreAlAprobar(c,s).length;
   const limitado = paraPlan && !cabe(c,s);
   const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : falta.length ? "Condicional · añadir" : "Añadir al plan") : st;
-  const pista = st === "Bloqueado" ? "Falta aprobar: "+falta.map(id => catalogo.get(id).name).join(", ") : "";
-  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista ? "<small>"+pista+"</small>" : ""}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
+  const pista = c.req.length ? '<span class="requisitos"><b>Necesitas aprobar</b>'+c.req.map(id => {
+    const req = catalogo.get(id);
+    const registro = s.estados[id] || "Pendiente";
+    return '<span><em class="req-'+(registro === "Aprobado" ? "ok" : "falta")+'">'+registro+'</em> '+req.id+' · '+req.name+'</span>';
+  }).join("")+'</span>' : '<small>Sin prerrequisitos</small>';
+  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
 }
 function mapa() {
   const q = normalizar($("buscar").value.trim()), f = $("filtro").value;
@@ -62,10 +66,15 @@ function detalle(id) {
   const nombres = (lista, conEstado) => lista.map(x => {
     const otros = faltantes(x,s).filter(r => r !== id);
     const abre = abreAlAprobar(c,s).some(curso => curso.id === x.id);
-    const nota = conEstado || s.estados[x.id] ? estado(x,s) : abre ? "Se abre al aprobar este curso" : otros.length ? "También requiere aprobar "+otros.map(r => catalogo.get(r).name).join(", ") : estado(x,s);
+    const nota = conEstado ? (s.estados[x.id] || (estado(x,s) === "Disponible" ? "Pendiente · disponible para cursar" : "Pendiente · tiene prerrequisitos")) : s.estados[x.id] ? estado(x,s) : abre ? "Se abre al aprobar este curso" : otros.length ? "También requiere aprobar "+otros.map(r => catalogo.get(r).name).join(", ") : estado(x,s);
     return `<li><button class="ruta" data-curso="${x.id}">${x.name} · ${x.id}<small>${nota}</small></button></li>`;
   }).join("");
-  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${estado(c,s)}</p><h3>Prerrequisitos</h3>${c.req.length ? "<ul>"+nombres(c.req.map(r => catalogo.get(r)),true)+"</ul>" : "<p>Ingreso libre según la red.</p>"}<h3>Es requisito para</h3>${siguientes.length ? "<ul>"+nombres(siguientes,false)+"</ul>" : "<p>Sin cursos posteriores vinculados.</p>"}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
+  const ruta = rutaPendiente(c,s);
+  const previos = ruta.filter(x => !c.req.includes(x.id));
+  const listaPrevia = previos.length ? '<h3>Clases previas que también te faltan</h3><p>En orden de prerrequisitos. Selecciona una clase para seguir su ruta.</p><ol>'+nombres(previos,true)+'</ol>' : "";
+  const pendientes = faltantes(c,s).length;
+  const resumen = c.req.length ? (pendientes ? "Te falta aprobar "+pendientes+" de "+c.req.length+" requisitos directos." : "Ya aprobaste todos los requisitos directos.") : "";
+  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${estado(c,s)}</p><h3>Clases que necesitas para llevarla</h3><p>${resumen}</p>${c.req.length ? "<ul>"+nombres(c.req.map(r => catalogo.get(r)),true)+"</ul>" : "<p>Ingreso libre según la red.</p>"}${listaPrevia}<h3>Es requisito para</h3>${siguientes.length ? "<ul>"+nombres(siguientes,false)+"</ul>" : "<p>Sin cursos posteriores vinculados.</p>"}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>`;
   $("detalle").setAttribute("aria-labelledby","tituloCurso");
   if (!$("detalle").open) $("detalle").showModal();
 }
