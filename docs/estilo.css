@@ -3,3 +3,5 @@
 .orden{margin:12px 0}.estado-disponible{border-left:4px solid #349763}.estado-bloqueado{border-left:4px solid #ac7355}.estado-aprobado{border-left:4px solid #146142}.estado-en-curso{border-left:4px solid #457eb7}.bloqueado{background:#f6e9de;color:#704226}.card small,.ruta small{font-size:.83rem;line-height:1.4}.impacto{color:#185838;font-weight:650}.ruta{text-align:left;width:100%}.ruta small{display:block;color:#49675a}.planbox label{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}.planbox p{margin-top:10px}.card:disabled{cursor:default}
 
 .requisitos{display:grid;gap:6px;border-top:1px solid var(--edge);padding-top:8px;width:100%;font-size:.84rem;line-height:1.45}.req-ok,.req-falta{font-weight:650;font-style:normal}.req-ok{color:#21673f}.req-falta{color:#875524}dialog ol{padding-left:24px}
+
+.malla{display:flex;gap:12px;overflow-x:auto;padding:14px 2px 22px}.malla section{flex:0 0 235px}.malla h3{margin-bottom:12px}.malla .card{width:100%;margin-bottom:8px}.tipo{font-weight:600;color:#4b5864}.inner details{background:#fafcfb}

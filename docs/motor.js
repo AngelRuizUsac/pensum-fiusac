@@ -54,3 +54,23 @@ function rutaPendiente(c, s) {
   c.req.forEach(visitar);
   return ruta;
 }
+
+// Ambos seminarios exigen la misma cadena de prerrequisitos. Las prácticas
+// también forman parte del cierre indicado en la red CLAR 2025 de FIUSAC.
+// Las dos humanísticas de 3 CLAR son necesarias para alcanzar 8 de 10.
+const esenciales = new Set(["0017","0019","2025","2036","2009"]);
+function incluirRequisitos(id) {
+  for (const previo of catalogo.get(id).req) {
+    if (esenciales.has(previo)) continue;
+    esenciales.add(previo);
+    incluirRequisitos(previo);
+  }
+}
+for (const id of ["0799","7999","2025","2036","2009"]) incluirRequisitos(id);
+function tipoCurso(id) {
+  if (["0799","7999"].includes(id)) return "Obligatorio según modalidad";
+  if (esenciales.has(id)) return "Obligatorio";
+  if (["0006","0008","0009","0011"].includes(id)) return "No obligatorio · vía de inglés";
+  if (["0001","0010","0018"].includes(id)) return "No obligatorio · elección de área";
+  return "Obligatoriedad por confirmar";
+}
