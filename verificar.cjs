@@ -58,6 +58,11 @@ vm.runInContext(`
   anual.vacaciones = ["0101","0103"];
   assert.deepEqual(evaluarCiclos(anual)[0].validos,["0101"]);
   assert.throws(()=>validar(anual));
+  const rutaFisica = redDelCurso("0150");
+  assert.ok(rutaFisica.niveles.has("0101") && rutaFisica.niveles.has("0152"));
+  assert.ok(redDelCurso("0014").niveles.has("0732"));
+  assert.equal(redDelCurso("0014","pensum").niveles.size,cursos.length);
+  for (const [a,b] of rutaFisica.aristas) assert.ok(catalogo.get(b).req.includes(a) && rutaFisica.niveles.get(a)<rutaFisica.niveles.get(b));
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
