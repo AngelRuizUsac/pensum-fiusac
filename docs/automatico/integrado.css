@@ -1,0 +1,8 @@
+body.integrado{background:transparent}
+body.integrado .layout{max-width:none;margin:0;padding:0;grid-template-columns:minmax(250px,330px) minmax(0,1fr);gap:18px}
+body.integrado .sidebar{display:flex!important;visibility:visible;transform:none;position:static;height:auto;width:auto;padding:0;overflow:visible;background:transparent}
+.integrado .pie-seo,.integrado .scrim,.integrado .solo-movil{display:none!important}
+.cursos-plegables summary{cursor:pointer;font-weight:700}.cursos-plegables .panel{border:0;padding:12px 0 0;box-shadow:none}
+.dialogo-plan{width:min(520px,93vw);max-height:85vh;overflow:auto;border-radius:14px;padding:20px;background:var(--tarjeta);color:var(--tinta);border:1px solid var(--borde)}
+.dialogo-plan::backdrop{background:#060b16b5}.dialogo-plan h2{margin:0 0 8px}.opcion-plan{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--borde)}.opcion-plan small{display:block;margin-top:4px}.opcion-plan:has(input:disabled){opacity:.65}.pie-plan{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+@media(max-width:760px){body.integrado .layout{grid-template-columns:minmax(0,1fr)}}

@@ -123,34 +123,19 @@ function validarCargaAutomatica(ids,periodo){
 }
 function abrirOriginal(forzar=false){
   const marco=$("originalHorario"),periodo=codigoPeriodoOriginal();
-  $("cicloOriginal").innerHTML=ciclosDe(s).map((c,i)=>c.ids.length?'<option value="'+i+'">'+(i+1)+'. '+c.tipo+' · '+c.ids.length+' cursos</option>':"").join("");
-  $("importarCiclo").disabled=!$("cicloOriginal").options.length;
   if(!marco.hasAttribute("src") || periodo!==ultimoPeriodoOriginal || forzar){
     if(!marco.hasAttribute("src") && cursosParaOriginal===null && deseados.size)cursosParaOriginal=[...deseados];
-    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=18";
+    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=19";
   }
 }
 function iniciarOriginalCon(ids){cursosParaOriginal=ids;abrirOriginal(true);}
-$("importarCiclo").onclick=()=>{
-  const ciclo=ciclosDe(s)[Number($("cicloOriginal").value)];
-  if(!ciclo?.ids.length)return;
-  if((ciclo.tipo==="Vacaciones")!==codigoPeriodoOriginal().startsWith("v")){$("avisoOriginal").textContent="Elegí el período correspondiente al ciclo.";return;}
-  iniciarOriginalCon([...ciclo.ids]);$("avisoOriginal").textContent="Cursos enviados al generador.";
-};
-$("guardarOriginal").onclick=()=>{
-  const r=$("originalHorario").contentWindow?.leerSeccionesAutomaticas?.();
-  const informar=msg=>$("avisoOriginal").textContent=msg;
-  if(!r?.cursos?.length)return informar("Generá y elegí un horario primero.");
-  if(!ofertaVista || r.periodo!==codigoPeriodoOriginal())return informar("Seleccioná el mismo período en Mi horario y en el generador.");
-  const nuevas=[];
-  for(const c of r.cursos) for(const k of c.opcion.componentes){
-    const tipo=k.categoria==="Clase"?"Teoría":k.categoria.toLowerCase()==="trabajo dirigido"?"Trabajo dirigido":k.categoria;
-    const sec=ofertaVista.secciones.find(x=>x.id===c.codigo && x.tipo===tipo && x.sec===k.seccion);
-    if(!sec)return informar("La sección "+c.codigo+" "+k.seccion+" falta en la oferta de tu pénsum.");
-    const razon=razonHorario(sec,nuevas);if(razon)return informar(razon);nuevas.push(sec);
-  }
-  if(elegidas.size && !confirm("¿Reemplazar las secciones de tu semana con este horario?"))return;
-  elegidas=new Set(nuevas.map(sec=>sec.clave));
-  try{localStorage.setItem(llaveHorario(),JSON.stringify([...elegidas]));}catch{avisar("No se pudo guardar la selección.");}
-  cambiarModo(false);dibujarHorario();informar("");
-};
+
+function planesParaHorario(){
+  return ciclosDe(s).map((c,indice)=>({indice,tipo:c.tipo,cursos:c.ids.map(id=>({id,nombre:catalogo.get(id).name}))})).filter(p=>p.cursos.length);
+}
+function periodoDesdeGenerador(valor){
+  if(!["1","2","v1","v2"].includes(valor))return;
+  ultimoPeriodoOriginal=valor;
+  $("periodoHorario").value=(valor.startsWith("v")?"vacaciones/":"semestre/")+valor.at(-1);
+  abrirHorario();
+}
