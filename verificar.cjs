@@ -135,3 +135,17 @@ vm.runInContext(`
   assert.throws(() => validar({...s, estados:{"0101":"inválido"}}));
 `,entorno);
 console.log("Catálogo, prerrequisitos, proyección y respaldo verificados.");
+
+vm.runInContext(fs.readFileSync(path.join(__dirname,"docs/oferta.js"),"utf8"),entorno);
+vm.runInContext(`
+  for(const [mes,periodo] of [[4,"semestre/1"],[5,"vacaciones/1"],[6,"vacaciones/1"],[7,"semestre/2"],[11,"vacaciones/2"],[12,"vacaciones/2"]])
+    assert.equal(calendario(new Date(Date.UTC(2026,mes-1,15))).actual,periodo);
+  const pVac=periodoVac(), pOtra=periodoVac(1);
+  ofertas.set(pVac,{anio:calendario().anio,horas:new Map([["0101",4]])});
+  ofertas.set(pOtra,{anio:calendario().anio,horas:new Map([["0103",4]])});
+  assert.equal(permiteVac(inicial(),"0101"),true);
+  assert.equal(permiteVac(inicial(),"0103"),false);
+  assert.equal(permiteVac({...inicial(),noConfirmados:true},"0103"),true);
+  assert.equal(permiteVac(inicial(),"0103",1),true);
+  assert.equal(permiteVac(inicial(),"0101",1),false);
+`,entorno);

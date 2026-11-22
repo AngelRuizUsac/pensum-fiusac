@@ -2,7 +2,7 @@
 const planId = "fiusac-sistemas-28-clar";
 const catalogo = new Map(cursos.map(c => [c.id, c]));
 function inicial() {
-  return {plan: planId, version: 1, horasVac: {}, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], vacaciones: [], posteriores: [], proyectar: false};
+  return {plan: planId, version: 1, horasVac: {}, noConfirmados:false, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], vacaciones: [], posteriores: [], proyectar: false};
 }
 function validar(s) {
   const estadosValidos = ["Aprobado", "En curso"];
@@ -20,7 +20,7 @@ function validar(s) {
   if (typeof horasVac !== "object" || Array.isArray(horasVac) || !Object.entries(horasVac).every(([id,h]) => catalogo.has(id) && [2,4].includes(h))) throw Error("Duración de vacaciones inválida.");
   const idsPlan = [...vacaciones,...s.seleccion,...posteriores.flatMap(c => c.ids)];
   if (new Set(idsPlan).size !== idsPlan.length) throw Error("Curso repetido en el plan.");
-  return {...inicial(), horasVac:{...horasVac}, vacaciones:[...vacaciones], posteriores:posteriores.map(c => ({tipo:c.tipo,ids:[...c.ids]})), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
+  return {...inicial(), horasVac:{...horasVac}, noConfirmados:s.noConfirmados===true, vacaciones:[...vacaciones], posteriores:posteriores.map(c => ({tipo:c.tipo,ids:[...c.ids]})), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
 }
 function faltantes(c, s, proyectar = false) {
   return c.req.filter(id => s.estados[id] !== "Aprobado" && !(proyectar && s.estados[id] === "En curso"));
@@ -81,8 +81,11 @@ function redPosterior(id, completa) {
 
 // Horas diarias de teoría, Escuela de Vacaciones 2026. Computación 1 corresponde a junio.
 const horasPublicadas = {"0101":4,"0103":4,"0107":4,"0112":2,"0114":2,"0116":2,"0118":2,"0147":2,"0150":2,"0152":2,"0960":2};
-function horasCurso(s,id) {
-  return s.horasVac?.[id] ?? horasPublicadas[id] ?? 4;
+function horasCurso(s,id,n=s.indiceVac ?? 0) {
+  if(s.horasVac?.[id]) return s.horasVac[id];
+  const h=typeof ofertas==="undefined" ? null : ofertas.get(periodoVac(n))?.horas.get(id);
+  if(h!=null) return h<=2 ? 2 : Math.max(4,Math.ceil(h));
+  return horasPublicadas[id] ?? 4;
 }
 function horasCiclo(s,ids) {
   return ids.reduce((total,id) => total + horasCurso(s,id), 0);
@@ -92,12 +95,14 @@ function ciclosDe(s) {
 }
 function evaluarCiclos(s) {
   const simulacion = {...s,estados:{...s.estados}};
+  let nVac=-1;
   return ciclosDe(s).map(ciclo => {
-    const previo = {...simulacion,estados:{...simulacion.estados},seleccion:ciclo.ids};
+    if(ciclo.tipo==="Vacaciones") nVac++;
+    const previo = {...simulacion,indiceVac:nVac,estados:{...simulacion.estados},seleccion:ciclo.ids};
     const carga = sumar(ciclo.ids.map(id=>catalogo.get(id)));
     const max = ciclo.tipo === "Semestre" ? limite(s) : null;
-    const admisible = ciclo.tipo === "Vacaciones" ? horasCiclo(s,ciclo.ids) <= 4 : (max !== null && carga <= max);
-    const validos = ciclo.ids.filter(id => admisible && elegible(catalogo.get(id),previo));
+    const admisible = ciclo.tipo === "Vacaciones" ? horasCiclo(previo,ciclo.ids) <= 4 && ciclo.ids.length<=2 : (max !== null && carga <= max);
+    const validos = ciclo.ids.filter(id => admisible && (ciclo.tipo!=="Vacaciones" || typeof permiteVac==="undefined" || permiteVac(s,id,nVac)) && elegible(catalogo.get(id),previo));
     validos.forEach(id => simulacion.estados[id] = "Aprobado");
     return {...ciclo, previo, carga, max, validos};
   });

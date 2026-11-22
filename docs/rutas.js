@@ -4,16 +4,18 @@ function llenarOptativos(s,cfg,ruta) {
   const ocupados = new Set(ruta.ciclos.flatMap(c=>c.ids));
   const previos = {...s,estados:{...s.estados}};
   const max = cfg.maximo ?? limite(s);
-  for (const ciclo of ruta.ciclos) {
+  for (const [i,ciclo] of ruta.ciclos.entries()) {
+    const nVac=Math.floor((i+(cfg.inicio??0))/2);
     const vac = ciclo.tipo === "Vacaciones";
-    let carga = vac ? horasCiclo(s,ciclo.ids) : sumar(ciclo.ids.map(id=>catalogo.get(id)));
+    let carga = vac ? horasCiclo({...s,indiceVac:nVac},ciclo.ids) : sumar(ciclo.ids.map(id=>catalogo.get(id)));
     const saldo = (vac ? 4 : max) - carga;
     // Mochila 0/1: entre los optativos elegibles, aprovecha el mayor número de CLAR.
     const opciones = Array(saldo+1).fill(null);
     opciones[0] = {creditos:0,ids:[]};
     for (const c of cursos) {
       if (c.obligatorio || ["0799","7999"].includes(c.id) || ocupados.has(c.id) || !elegible(c,previos)) continue;
-      const peso = vac ? horasCurso(s,c.id) : c.credits;
+      if(vac && typeof permiteVac!=="undefined" && !permiteVac(s,c.id,nVac)) continue;
+      const peso = vac ? horasCurso(s,c.id,nVac) : c.credits;
       for (let n=saldo;n>=peso;n--) {
         const previo = opciones[n-peso];
         if (previo && previo.creditos+c.credits > (opciones[n]?.creditos ?? -1))
@@ -82,16 +84,22 @@ function* resolverMeta(s, cfg) {
   const orden = lista.map((_,i)=>i).sort((a,b)=>largo[b]-largo[a] || hijos[b].length-hijos[a].length || lista[b].credits-lista[a].credits);
   // Una asignación factible sirve de cota superior y de respaldo para metas grandes.
   const esVac = t => cfg.vacaciones && (t+(cfg.inicio ?? 0))%2===0;
-  const horas = lista.map(c => horasCurso(s,c.id));
+  const indiceVac = t=>Math.floor((t+(cfg.inicio??0))/2);
+  const horas=(i,t)=>horasCurso(s,lista[i].id,indiceVac(t));
+  const enVac=(i,t)=>typeof permiteVac==="undefined" || permiteVac(s,lista[i].id,indiceVac(t));
   const asignado = lista.map(()=>-1);
   let faltan=lista.length, t=0;
+  let vacios=0;
   while(faltan) {
+    const anteriores=faltan;
     let carga=0, horasUsadas=0;
     for(const i of orden) {
       if(asignado[i]>=0 || padres[i].some(p=>asignado[p]<0 || asignado[p]===t)) continue;
-      if(esVac(t) ? horasUsadas+horas[i]>4 : carga+lista[i].credits>max) continue;
-      asignado[i]=t; horasUsadas+=horas[i]; carga+=lista[i].credits; faltan--;
+      if(esVac(t) ? !enVac(i,t) || horasUsadas+horas(i,t)>4 : carga+lista[i].credits>max) continue;
+      asignado[i]=t; horasUsadas+=horas(i,t); carga+=lista[i].credits; faltan--;
     }
+    vacios=anteriores===faltan ? vacios+1 : 0;
+    if(vacios>=6) throw Error("La oferta y el límite de créditos impiden completar la meta. Revisa el máximo personal o incluye no confirmados.");
     t++;
   }
 
@@ -116,7 +124,7 @@ function* resolverMeta(s, cfg) {
       const desde=[], hasta=[], dominios=[];
       function cabeEn(i,j) {
         if(puestos[i]>=0) return puestos[i]===j;
-        return esVac(j) ? horasUsadas[j]+horas[i]<=4 : carga[j]+lista[i].credits<=max;
+        return esVac(j) ? enVac(i,j) && horasUsadas[j]+horas(i,j)<=4 : carga[j]+lista[i].credits<=max;
       }
       // Propaga ambos extremos por el grafo antes de elegir la materia más restringida.
       for(let i=0;i<lista.length;i++) {
@@ -153,9 +161,9 @@ function* resolverMeta(s, cfg) {
         }
       }
       for(const j of dominios[elegido]) {
-        puestos[elegido]=j; horasUsadas[j]+=horas[elegido]; carga[j]+=lista[elegido].credits;
+        puestos[elegido]=j; horasUsadas[j]+=horas(elegido,j); carga[j]+=lista[elegido].credits;
         if(yield* buscar(restantes-1)) return true;
-        puestos[elegido]=-1; horasUsadas[j]-=horas[elegido]; carga[j]-=lista[elegido].credits;
+        puestos[elegido]=-1; horasUsadas[j]-=horas(elegido,j); carga[j]-=lista[elegido].credits;
       }
       return false;
     }
