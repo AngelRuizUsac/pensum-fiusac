@@ -71,7 +71,7 @@ function prepararComparador(){
 function listaDeseados(){
   $("listaDeseados").innerHTML=[...deseados].map(id=>'<button data-retirar="'+id+'">'+escHorario(catalogo.get(id).name)+' ×</button>').join(" ") || "Todavía no elegiste cursos.";
   const q=normalizar($("buscarMateriaHorario").value.trim());
-  $("materiaHorario").innerHTML=cursos.filter(c=>!deseados.has(c.id) && normalizar(c.name+" "+c.id).includes(q) && ofertaVista?.secciones.some(x=>x.id===c.id)).map(c=>'<option value="'+c.id+'">'+escHorario(c.id+" · "+c.name)+'</option>').join("");
+  $("materiaHorario").innerHTML=cursos.filter(c=>(!perfilRapido || elegible(c,perfilRapido)) && !deseados.has(c.id) && normalizar(c.name+" "+c.id).includes(q) && ofertaVista?.secciones.some(x=>x.id===c.id)).map(c=>'<option value="'+c.id+'">'+escHorario(c.id+" · "+c.name)+'</option>').join("");
 }
 $("buscarMateriaHorario").oninput=listaDeseados;
 $("sumarMateriaHorario").onclick=()=>{
