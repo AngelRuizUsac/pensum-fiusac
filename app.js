@@ -68,10 +68,14 @@ function mapa() {
 }
 let cicloActivo = 1;
 function etiquetaHoras(id) {
-  return s.horasVac[id] ? s.horasVac[id]+" h" : "4 h reservadas (por confirmar)";
+  return s.horasVac[id] ? s.horasVac[id]+" h" : horasPublicadas[id] ? horasPublicadas[id]+" h de teoría (FIUSAC)" : "4 h reservadas (por confirmar)";
 }
 $("cursoHoras").innerHTML = cursos.map(c=>`<option value="${c.id}">${c.id} · ${c.name}</option>`).join("");
-$("cursoHoras").onchange = () => $("duracionVac").value = s.horasVac[$("cursoHoras").value] ?? "";
+$("cursoHoras").onchange = () => {
+  const id = $("cursoHoras").value;
+  $("duracionVac").options[0].textContent = horasPublicadas[id] ? "Horario publicado · "+horasPublicadas[id]+" h" : "Sin confirmar";
+  $("duracionVac").value = s.horasVac[id] ?? "";
+};
 $("duracionVac").onchange = () => {
   const id = $("cursoHoras").value, valor = Number($("duracionVac").value);
   if (valor) s.horasVac[id] = valor;
@@ -142,6 +146,7 @@ function detalle(id) {
   $("modoGrafo").onchange = e => { modoGrafo = e.target.value; detalle(id); $("modoGrafo").focus(); };
 }
 function render() {
+  $("topePerfil").textContent = limite(s) ? "Máximo por promedio: "+limite(s)+" CLAR." : "Selecciona tu promedio en Mi límite de créditos.";
   $("rango").value = s.rango;
   $("doble").checked = s.doble;
   $("actual").value = s.semestre;

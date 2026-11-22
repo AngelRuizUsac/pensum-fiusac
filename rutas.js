@@ -1,7 +1,52 @@
 "use strict";
 // Minimiza el número de períodos transcurridos para un calendario y una meta fijos.
-function* explorarRutas(s, cfg) {
-  const max = limite(s);
+function llenarOptativos(s,cfg,ruta) {
+  const ocupados = new Set(ruta.ciclos.flatMap(c=>c.ids));
+  const previos = {...s,estados:{...s.estados}};
+  const max = cfg.maximo ?? limite(s);
+  for (const ciclo of ruta.ciclos) {
+    const vac = ciclo.tipo === "Vacaciones";
+    let carga = vac ? horasCiclo(s,ciclo.ids) : sumar(ciclo.ids.map(id=>catalogo.get(id)));
+    const saldo = (vac ? 4 : max) - carga;
+    // Mochila 0/1: entre los optativos elegibles, aprovecha el mayor número de CLAR.
+    const opciones = Array(saldo+1).fill(null);
+    opciones[0] = {creditos:0,ids:[]};
+    for (const c of cursos) {
+      if (c.obligatorio || ["0799","7999"].includes(c.id) || ocupados.has(c.id) || !elegible(c,previos)) continue;
+      const peso = vac ? horasCurso(s,c.id) : c.credits;
+      for (let n=saldo;n>=peso;n--) {
+        const previo = opciones[n-peso];
+        if (previo && previo.creditos+c.credits > (opciones[n]?.creditos ?? -1))
+          opciones[n] = {creditos:previo.creditos+c.credits,ids:[...previo.ids,c.id]};
+      }
+    }
+    const mejor = opciones.reduce((a,b)=>b && b.creditos>a.creditos ? b : a,opciones[0]);
+    ciclo.ids.push(...mejor.ids);
+    mejor.ids.forEach(id=>ocupados.add(id));
+    for (const id of ciclo.ids) previos.estados[id]="Aprobado";
+  }
+}
+function* explorarRutas(s,cfg) {
+  if (cfg.meta !== "fases") return yield* resolverMeta(s,cfg);
+  const primera = yield* etapa(s,{...cfg,meta:"obligatorios"},"Obligatorios");
+  const estados = {...s.estados};
+  for (const ciclo of primera.ciclos) for (const id of ciclo.ids) estados[id]="Aprobado";
+  const segunda = yield* etapa({...s,estados},{...cfg,meta:"todo",extras:false,
+    inicio:primera.ciclos.length},"Optativos");
+  return {ciclos:[...primera.ciclos,...segunda.ciclos],fases:true,corte:primera.ciclos.length};
+}
+function* etapa(s,cfg,nombre) {
+  const generador=resolverMeta(s,cfg);
+  for (let paso=generador.next();;paso=generador.next()) {
+    if (paso.done) return paso.value;
+    yield {etapa:nombre,horizonte:paso.value.horizonte};
+  }
+}
+function* resolverMeta(s, cfg) {
+  const oficial = limite(s);
+  const max = cfg.maximo ?? oficial;
+  if (cfg.maximo != null && (!Number.isInteger(max) || max<1 || (oficial && max>oficial)))
+    throw Error("El máximo debe ser un entero entre 1 y el límite de tu promedio.");
   const aprobados = id => s.estados[id] === "Aprobado" || (s.proyectar && s.estados[id] === "En curso");
   const hasta = cfg.meta === "dia" ? s.semestre : cfg.semestre;
   const modalidad = c => !["0799","7999"].includes(c.id) || c.id === cfg.seminario;
@@ -23,10 +68,11 @@ function* explorarRutas(s, cfg) {
   }
   meta.forEach(incluir);
   if (!pendientes.size) return {ciclos:[],minima:true};
-  if (!max) throw Error("Selecciona primero el rango de tu promedio para calcular el límite semestral.");
+  if (!oficial) throw Error("Selecciona primero el rango de tu promedio para calcular el límite semestral.");
   const enCurso = [...pendientes].filter(id => s.estados[id] === "En curso");
   if (enCurso.length) throw Error("La meta depende de cursos actuales: "+enCurso.map(id=>catalogo.get(id).name).join(", ")+". Activa la proyección de aprobaciones o actualiza tu registro.");
   const lista = cursos.filter(c => pendientes.has(c.id));
+  if (!cfg.vacaciones && lista.some(c=>c.credits>max)) throw Error("Hay cursos que superan tu máximo personal. Aumenta el límite o habilita vacaciones.");
   const idx = new Map(lista.map((c,i)=>[c.id,i]));
   const padres = lista.map(c=>c.req.filter(id=>idx.has(id)).map(id=>idx.get(id)));
   const hijos = lista.map(()=>[]);
@@ -35,7 +81,7 @@ function* explorarRutas(s, cfg) {
   for(let i=lista.length-1;i>=0;i--) for(const h of hijos[i]) largo[i]=Math.max(largo[i],1+largo[h]);
   const orden = lista.map((_,i)=>i).sort((a,b)=>largo[b]-largo[a] || hijos[b].length-hijos[a].length || lista[b].credits-lista[a].credits);
   // Una asignación factible sirve de cota superior y de respaldo para metas grandes.
-  const esVac = t => cfg.vacaciones && t%2===0;
+  const esVac = t => cfg.vacaciones && (t+(cfg.inicio ?? 0))%2===0;
   const horas = lista.map(c => horasCurso(s,c.id));
   const asignado = lista.map(()=>-1);
   let faltan=lista.length, t=0;
@@ -54,7 +100,9 @@ function* explorarRutas(s, cfg) {
       tipo:esVac(j)?"Vacaciones":"Semestre",
       ids:lista.filter((_,i)=>solucion[i]===j).map(c=>c.id)
     }));
-    return {ciclos,minima};
+    const ruta = {ciclos,minima};
+    if (cfg.extras) llenarOptativos(s,cfg,ruta);
+    return ruta;
   }
   const inicialFactible = resultado(asignado,t,false);
   let visitas=0;
