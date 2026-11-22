@@ -3,6 +3,9 @@ function cambiarModo(auto){
   $("horario").dataset.modo=auto?"auto":"manual";
   $("modoManual").setAttribute("aria-pressed",String(!auto));
   $("modoAuto").setAttribute("aria-pressed",String(auto));
+  $("mesaHorario").hidden=auto;
+  $("vistaOriginal").hidden=!auto;
+  if(auto) abrirOriginal();
   $("sitioCatalogo").hidden=auto;
   $("ajustesAuto").hidden=!auto;
   $("alternativas").hidden=!auto;
@@ -76,11 +79,12 @@ function aplicarSugerenciaPendiente(){
     if(sec && (periodoVista.startsWith("vacaciones") || sumar(seleccion.map(x=>catalogo.get(x.id)))+c.credits<=(limite(perfilRapido)??32))) seleccion.push(sec);
   }
   deseados=new Set(seleccion.map(x=>x.id));
+  iniciarOriginalCon([...deseados]);
   cancelarComparacion();listaDeseados();
   $("notaRapida").textContent="Semestre "+perfilRapido.semestre+" · "+seleccion.length+" cursos sugeridos."+(!perfilRapido.rango && periodoVista.startsWith("semestre")?" Se usaron 32 CLAR como máximo provisional.":"")+" Compará sus secciones y laboratorios.";
 }
 $("quitarRapida").onclick=()=>{
-  perfilRapido=null;pendienteSugerencia=false;deseados.clear();$("soloElegibles").checked=false;$("perfilActivo").hidden=true;
+  perfilRapido=null;pendienteSugerencia=false;deseados.clear(); iniciarOriginalCon([]);$("soloElegibles").checked=false;$("perfilActivo").hidden=true;
   cancelarComparacion();listaDeseados();dibujarHorario();
 };
 $("formPerfil").onsubmit=e=>{
@@ -96,4 +100,57 @@ $("formPerfil").onsubmit=e=>{
     perfilRapido=null;pendienteSugerencia=false;$("perfilActivo").hidden=true;guardar();cancelarComparacion();listaDeseados();
   }
   $("perfilHorario").close();dibujarHorario();
+};
+
+let cursosParaOriginal=null,ultimoPeriodoOriginal="";
+function codigoPeriodoOriginal(){
+  const p=periodoVista||$("periodoHorario").value||calendario().actual;
+  return (p.startsWith("vacaciones")?"v":"")+p.at(-1);
+}
+function contextoAutomatico(){
+  const perfil=perfilDelHorario(),cursos=cursosParaOriginal;
+  cursosParaOriginal=null;
+  return {preferidas:[...favoritas],periodo:codigoPeriodoOriginal(),tema:document.documentElement.dataset.tema==="oscuro"?"dark":"light",cursos,
+    aprobados:Object.entries(perfil.estados).filter(([,e])=>e==="Aprobado").map(([id])=>id)};
+}
+function validarCargaAutomatica(ids,periodo){
+  const perfil=perfilDelHorario();
+  if(periodo.startsWith("v")){
+    const horas=ofertas.get("vacaciones/"+periodo.at(-1))?.horas;
+    if(ids.length>2 || ids.reduce((n,id)=>n+(perfil.horasVac[id]??horas?.get(id)??horasPublicadas[id]??4),0)>4) return "Vacaciones permite un curso de 4 h o hasta dos de 2 h.";
+  }else if(limite(perfil) && ids.reduce((n,id)=>n+(catalogo.get(id)?.credits??0),0)>limite(perfil))return "La selección supera el máximo de créditos de tu perfil.";
+  return "";
+}
+function abrirOriginal(forzar=false){
+  const marco=$("originalHorario"),periodo=codigoPeriodoOriginal();
+  $("cicloOriginal").innerHTML=ciclosDe(s).map((c,i)=>c.ids.length?'<option value="'+i+'">'+(i+1)+'. '+c.tipo+' · '+c.ids.length+' cursos</option>':"").join("");
+  $("importarCiclo").disabled=!$("cicloOriginal").options.length;
+  if(!marco.hasAttribute("src") || periodo!==ultimoPeriodoOriginal || forzar){
+    if(!marco.hasAttribute("src") && cursosParaOriginal===null && deseados.size)cursosParaOriginal=[...deseados];
+    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=18";
+  }
+}
+function iniciarOriginalCon(ids){cursosParaOriginal=ids;abrirOriginal(true);}
+$("importarCiclo").onclick=()=>{
+  const ciclo=ciclosDe(s)[Number($("cicloOriginal").value)];
+  if(!ciclo?.ids.length)return;
+  if((ciclo.tipo==="Vacaciones")!==codigoPeriodoOriginal().startsWith("v")){$("avisoOriginal").textContent="Elegí el período correspondiente al ciclo.";return;}
+  iniciarOriginalCon([...ciclo.ids]);$("avisoOriginal").textContent="Cursos enviados al generador.";
+};
+$("guardarOriginal").onclick=()=>{
+  const r=$("originalHorario").contentWindow?.leerSeccionesAutomaticas?.();
+  const informar=msg=>$("avisoOriginal").textContent=msg;
+  if(!r?.cursos?.length)return informar("Generá y elegí un horario primero.");
+  if(!ofertaVista || r.periodo!==codigoPeriodoOriginal())return informar("Seleccioná el mismo período en Mi horario y en el generador.");
+  const nuevas=[];
+  for(const c of r.cursos) for(const k of c.opcion.componentes){
+    const tipo=k.categoria==="Clase"?"Teoría":k.categoria.toLowerCase()==="trabajo dirigido"?"Trabajo dirigido":k.categoria;
+    const sec=ofertaVista.secciones.find(x=>x.id===c.codigo && x.tipo===tipo && x.sec===k.seccion);
+    if(!sec)return informar("La sección "+c.codigo+" "+k.seccion+" falta en la oferta de tu pénsum.");
+    const razon=razonHorario(sec,nuevas);if(razon)return informar(razon);nuevas.push(sec);
+  }
+  if(elegidas.size && !confirm("¿Reemplazar las secciones de tu semana con este horario?"))return;
+  elegidas=new Set(nuevas.map(sec=>sec.clave));
+  try{localStorage.setItem(llaveHorario(),JSON.stringify([...elegidas]));}catch{avisar("No se pudo guardar la selección.");}
+  cambiarModo(false);dibujarHorario();informar("");
 };

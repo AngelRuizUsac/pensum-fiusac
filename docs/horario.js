@@ -49,6 +49,7 @@ async function abrirHorario(forzar=false) {
     $("estadoHorario").textContent=nota+nombresPeriodo[periodo]+" "+(datos.anio??"(año sin verificar)")+" · "+(datos.fuente?"Catálogo de "+datos.fuente+" · ":"")+(periodo===fecha.actual && datos.anio===fecha.anio?"Período actual":"Horario de referencia");
     $("fuenteHorario").href="https://usuarios.ingenieria.usac.edu.gt/horarios/"+periodo;
     prepararComparador();aplicarSugerenciaPendiente();dibujarHorario();
+    if($("horario").dataset.modo==="auto") abrirOriginal();
   } catch {
     if(turno===revisionHorario) $("estadoHorario").textContent="No se pudo leer el horario. Reintenta o elige otro período.";
   }
