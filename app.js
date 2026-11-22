@@ -148,6 +148,7 @@ function detalle(id) {
   $("modoGrafo").onchange = e => { modoGrafo = e.target.value; detalle(id); $("modoGrafo").focus(); };
 }
 function render() {
+  document.body.dataset.vista=vista;
   $("noConfirmados").checked=!!s.noConfirmados;
   $("topePerfil").textContent = limite(s) ? "Máximo por promedio: "+limite(s)+" CLAR." : "Selecciona tu promedio en Mi límite de créditos.";
   $("rango").value = s.rango;
@@ -189,7 +190,7 @@ document.addEventListener("click",e => {
   const b = e.target.closest("button");
   if (!b) return;
   const d = b.dataset;
-  if (d.view) { vista = d.view; render(); if(vista==="horario") abrirHorario(); if(vista==="plan") iniciarOfertaPlan(); }
+  if (d.view) { vista = d.view; history.replaceState(null,"","#"+vista); render(); if(vista==="horario") abrirHorario(); if(vista==="plan") iniciarOfertaPlan(); }
   if (d.curso || d.nodo) detalle(d.curso || d.nodo);
   if ("ajustar" in d) {
     const region = $("contenido").querySelector(".grafo"), lienzo = region.firstElementChild;
