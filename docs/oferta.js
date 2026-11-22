@@ -44,16 +44,37 @@ function cargaSeccion(sec) {
   for(const b of sec.bloques) for(const dia of b.dias) totales[dia]=(totales[dia]||0)+minutos(b.fin)-minutos(b.inicio);
   return Math.max(...Object.values(totales))/60;
 }
+function catalogoNoHayCupo(datos,codigo) {
+  if(datos.semestre!==codigo || !Array.isArray(datos.cursos)) throw Error("Catálogo incompatible");
+  const grupos=new Map();
+  for(const curso of datos.cursos) {
+    if(!catalogo.has(curso.codigo)) continue;
+    for(const fila of curso.secciones) {
+      if(!fila.inicio || !fila.fin || fila.inicio>=fila.fin || !Array.isArray(fila.dias) || !fila.dias.length) continue;
+      const tipo=fila.categoria==="Trabajo Dirigido"?"Trabajo dirigido":fila.categoria||"Teoría";
+      const clave=[curso.codigo,tipo,fila.seccion].join("/");
+      if(!grupos.has(clave)) grupos.set(clave,{clave,id:curso.codigo,tipo,sec:fila.seccion,bloques:[],restricciones:false});
+      const grupo=grupos.get(clave);
+      grupo.restricciones ||= !!fila.restringida;
+      const bloque={dias:fila.dias,inicio:fila.inicio,fin:fila.fin,docente:fila.catedratico||"Sin asignar",auxiliar:fila.auxiliar||"Sin auxiliar",lugar:fila.modalidad||"Sin ubicación"};
+      if(!grupo.bloques.some(b=>JSON.stringify(b)===JSON.stringify(bloque))) grupo.bloques.push(bloque);
+    }
+  }
+  return {anio:Number(datos.restricciones_params?.anio)||null,secciones:[...grupos.values()],fuente:"NoHayCupo"};
+}
 async function cargarOferta(periodo,forzar=false) {
   if(!forzar && ofertas.has(periodo)) return ofertas.get(periodo);
   if(solicitudes.has(periodo)) return solicitudes.get(periodo);
   const url="https://usuarios.ingenieria.usac.edu.gt/horarios/"+periodo;
   const descargar=async()=>{
-    for(const origen of [url,"https://corsproxy.net/?u="+encodeURIComponent(url)]) {
+    const codigo=(periodo.startsWith("vacaciones")?"v":"")+periodo.slice(-1);
+    const api="https://no-hay-cupo.vercel.app/api/catalogo/"+codigo;
+    const puente=u=>"https://corsproxy.net/?u="+encodeURIComponent(u);
+    for(const [origen,json] of [[url,false],[puente(url),false],[api,true],[puente(api),true]]) {
       try {
         const r=await fetch(origen,{cache:"no-store",credentials:"omit",referrerPolicy:"no-referrer",signal:AbortSignal.timeout(18000)});
         if(!r.ok) continue;
-        const datos=leer(await r.text(),periodo);
+        const datos=json ? catalogoNoHayCupo(await r.json(),codigo) : leer(await r.text(),periodo);
         datos.horas=new Map();
         for(const sec of datos.secciones.filter(sec=>sec.tipo==="Teoría" && !sec.bloques.some(b=>/CERRAD/i.test(b.lugar)))) {
           datos.horas.set(sec.id,Math.max(datos.horas.get(sec.id)||0,cargaSeccion(sec)));
@@ -90,7 +111,7 @@ async function iniciarOfertaPlan(forzar=false) {
   $("estadoOfertaPlan").textContent="Consultando ambas convocatorias…";
   cargaPlan=Promise.allSettled([cargarOferta("vacaciones/1",forzar),cargarOferta("vacaciones/2",forzar)]).then(()=>{
     const d=ofertas.get(periodoVac());
-    $("estadoOfertaPlan").textContent=d ? nombresPeriodo[periodoVac()]+" "+d.anio+" · "+d.horas.size+" cursos con teoría. Para ciclos futuros se usa como referencia la última oferta de junio o diciembre." : "Oferta vigente sin confirmar. Puedes planificar semestres o incluir cursos no confirmados.";
+    $("estadoOfertaPlan").textContent=d ? nombresPeriodo[periodoVac()]+" "+(d.anio??"(año sin verificar)")+" · "+d.horas.size+" cursos con teoría. Para ciclos futuros se usa como referencia la última oferta de junio o diciembre." : "Oferta vigente sin confirmar. Puedes planificar semestres o incluir cursos no confirmados.";
     limpiarRuta(); if(vista==="plan") planificar();
   });
   return cargaPlan;
