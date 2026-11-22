@@ -15,7 +15,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     try{localStorage.setItem("fiusac-tema",temaElegido);}catch{}
   };
   function ir(){const id=location.hash.slice(1);if(["horario","mapa","plan","datos"].includes(id) && vista!==id) document.querySelector('[data-view="'+id+'"]').click();}
-  ir();window.addEventListener("hashchange",ir);
+  ir();
+  if(vista==="horario" && new URLSearchParams(location.search).get("modo")==="automatico") cambiarModo(true);
+  window.addEventListener("hashchange",ir);
 });
 
 // Agenda por columnas y franjas, adaptada del patrón AgendaGrid de FisioGest.
