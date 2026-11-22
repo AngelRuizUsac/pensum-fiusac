@@ -10,6 +10,10 @@ window.apiHorario=async ruta=>{
 if(window.parent!==window && document.referrer && new URL(document.referrer).origin===location.origin){
   const perfil=window.parent.contextoAutomatico?.();
   if(perfil){
+    window.integrado=true; document.body.classList.add("integrado");
+    window.planesDelPensum=()=>parent.planesParaHorario();
+    window.irAlPlanificador=()=>parent.document.querySelector('[data-view="plan"]').click();
+    window.notificarPeriodo=valor=>parent.periodoDesdeGenerador(valor);
     let config={};
     try{config=JSON.parse(localStorage.getItem("nhc")||"{}")||{};}catch{}
     const favoritas=new Set(perfil.preferidas);
@@ -21,9 +25,9 @@ if(window.parent!==window && document.referrer && new URL(document.referrer).ori
       return datos;
     };
     if(perfil.periodo)config.semestre=perfil.periodo;
-    config.sidebarOculta=true;
+    config.sidebarOculta=false;
     if(perfil.aprobados)config.aprobadosPor={...config.aprobadosPor,28:perfil.aprobados};
-    if(!config.tema)config.tema=perfil.tema;
+    config.tema=perfil.tema; localStorage.setItem("nhc_visto","1");
     if(perfil.cursos){
       config.seleccion=perfil.cursos;
       config.manuales=perfil.cursos;
