@@ -20,10 +20,10 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 // Agenda por columnas y franjas, adaptada del patrón AgendaGrid de FisioGest.
 function grillaSemanal(secciones){
-  const dias=Object.entries(diasSemana).filter(([dia])=>!["SA","DO"].includes(dia) || secciones.some(s=>s.bloques.some(b=>b.dias.includes(dia))));
+  const dias=Object.entries(diasSemana).filter(([dia])=>dia!=="DO" || secciones.some(s=>s.bloques.some(b=>b.dias.includes(dia))));
   const bloques=secciones.flatMap(s=>s.bloques);
   const inicio=bloques.length?Math.floor(Math.min(...bloques.map(b=>minutos(b.inicio)))/60):7;
-  const fin=bloques.length?Math.ceil(Math.max(...bloques.map(b=>minutos(b.fin)))/60):13;
+  const fin=bloques.length?Math.ceil(Math.max(...bloques.map(b=>minutos(b.fin)))/60):19;
   const franjas=Array.from({length:fin-inicio},(_,i)=>inicio+i);
   const escala=franjas.map(h=>'<div>'+NoHayCupo.minToHHMM(h*60)+'</div>').join("");
   const columnas=dias.map(([dia,nombre])=>{

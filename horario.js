@@ -2,6 +2,8 @@
 const diasSemana={LU:"Lunes",MA:"Martes",MI:"Miércoles",JU:"Jueves",VI:"Viernes",SA:"Sábado",DO:"Domingo"};
 const escHorario=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 let ofertaVista=null, periodoVista="", revisionHorario=0, elegidas=new Set();
+let perfilRapido=null;
+function perfilDelHorario(){return perfilRapido??s;}
 function llaveHorario(){return planId+"-horario-"+periodoVista+"-"+(ofertaVista.anio??"referencia");}
 const sesionesPorSeccion=new WeakMap();
 function sesionesHorario(sec){
@@ -19,7 +21,7 @@ function razonHorario(sec,seleccion) {
   if(sec.tipo==="Teoría"){
     const teoria=seleccion.filter(x=>x.tipo==="Teoría");
     if(periodoVista.startsWith("vacaciones") && (teoria.length>=2 || teoria.reduce((n,x)=>n+cargaSeccion(x),cargaSeccion(sec))>4)) return "Supera la carga de vacaciones";
-    if(periodoVista.startsWith("semestre") && limite(s) && sumar([...teoria,sec].map(x=>catalogo.get(x.id)))>limite(s)) return "Supera el límite de créditos";
+    if(periodoVista.startsWith("semestre") && limite(perfilDelHorario()) && sumar([...teoria,sec].map(x=>catalogo.get(x.id)))>limite(perfilDelHorario())) return "Supera el límite de créditos";
   }
   return "";
 }
@@ -27,7 +29,8 @@ async function abrirHorario(forzar=false) {
   const turno=++revisionHorario, fecha=calendario(), solicitado=$("periodoHorario").value;
   let periodo=solicitado||fecha.actual, nota="";
   cancelarComparacion();
-  ofertaVista=null; $("agenda").replaceChildren(); $("secciones").replaceChildren();
+  $("cuentaHorario").textContent="";$("cuentaCursos").textContent="";
+  ofertaVista=null; $("agenda").innerHTML=grillaSemanal([]); $("secciones").replaceChildren();
   $("estadoHorario").textContent="Consultando el horario oficial…";
   try {
     let datos;
@@ -45,7 +48,7 @@ async function abrirHorario(forzar=false) {
     try { elegidas=new Set(JSON.parse(localStorage.getItem(llaveHorario())||"[]")); } catch { elegidas=new Set(); }
     $("estadoHorario").textContent=nota+nombresPeriodo[periodo]+" "+(datos.anio??"(año sin verificar)")+" · "+(datos.fuente?"Catálogo de "+datos.fuente+" · ":"")+(periodo===fecha.actual && datos.anio===fecha.anio?"Período actual":"Horario de referencia");
     $("fuenteHorario").href="https://usuarios.ingenieria.usac.edu.gt/horarios/"+periodo;
-    prepararComparador();dibujarHorario();
+    prepararComparador();aplicarSugerenciaPendiente();dibujarHorario();
   } catch {
     if(turno===revisionHorario) $("estadoHorario").textContent="No se pudo leer el horario. Reintenta o elige otro período.";
   }
@@ -54,13 +57,17 @@ function dibujarHorario() {
   if(!ofertaVista) return;
   const seleccion=ofertaVista.secciones.filter(x=>elegidas.has(x.clave));
   const q=normalizar($("filtroHorario").value.trim()), dia=$("diaHorario").value;
-  const filas=ofertaVista.secciones.filter(x=>(!$("soloElegibles").checked || elegible(catalogo.get(x.id),s) || s.estados[x.id]==="En curso") && normalizar([catalogo.get(x.id).name,x.clave,...x.bloques.flatMap(b=>[b.docente,b.auxiliar])].join(" ")).includes(q) && (!dia || x.bloques.some(b=>b.dias.includes(dia))));
+  const perfil=perfilDelHorario();
+  const modalidad=$("modalidadHorario").value.toUpperCase();
+  const filas=ofertaVista.secciones.filter(x=>(!modalidad || x.bloques.some(b=>b.lugar.toUpperCase().split(/[^A-Z]+/).includes(modalidad))) && (!$("soloElegibles").checked || elegible(catalogo.get(x.id),perfil) || perfil.estados[x.id]==="En curso") && normalizar([catalogo.get(x.id).name,x.clave,...x.bloques.flatMap(b=>[b.docente,b.auxiliar])].join(" ")).includes(q) && (!dia || x.bloques.some(b=>b.dias.includes(dia))));
   const nombre=x=>escHorario(x.id+" · "+catalogo.get(x.id).name+" · "+x.tipo+" "+(x.sec||"sin sección"));
   const boton=(x,t,des=false)=>'<button data-seccion="'+escHorario(x.clave)+'" '+(des?"disabled":"")+'>'+escHorario(t)+'</button>';
-  $("secciones").innerHTML=filas.map(x=>{
+  const tarjetaSeccion=x=>{
     const dentro=elegidas.has(x.clave), razon=dentro?"":razonHorario(x,seleccion);
     return '<article class="planbox"><strong>'+nombre(x)+'</strong>'+x.bloques.map(b=>'<p>'+escHorario(b.dias.join(" ")+" · "+b.inicio+"–"+b.fin+" · "+b.lugar)+'<br>'+escHorario("Docente: "+b.docente+" · Auxiliar: "+b.auxiliar)+'</p>').join("")+(x.restricciones?"<p>Ver restricciones en el horario oficial.</p>":"")+'<button data-preferida="'+escHorario(x.clave)+'" aria-pressed="'+favoritas.has(x.clave)+'">'+(favoritas.has(x.clave)?'★ Preferida':'☆ Preferir sección')+'</button> '+boton(x,dentro?"Quitar":razon||"Agregar",!!razon)+'</article>';
-  }).join("")||"<p>Sin secciones para estos filtros.</p>";
+  };
+  agruparCatalogo(filas,tarjetaSeccion);
+  $("cuentaHorario").textContent=seleccion.length+" secciones";
   $("agenda").innerHTML=(seleccion.length?'<p>'+seleccion.length+' secciones · '+sumar(seleccion.filter(x=>x.tipo==="Teoría").map(x=>catalogo.get(x.id)))+' CLAR</p>':"<p>Agrega una sección o aplica un horario para ver tu semana.</p>")+grillaSemanal(seleccion)+seleccion.map(x=>boton(x,"Quitar "+x.id+" "+x.sec)).join(" ");
 }
 $("horario").addEventListener("click",e=>{
