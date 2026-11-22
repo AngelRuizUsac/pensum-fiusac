@@ -36,14 +36,15 @@ function* explorarRutas(s, cfg) {
   const orden = lista.map((_,i)=>i).sort((a,b)=>largo[b]-largo[a] || hijos[b].length-hijos[a].length || lista[b].credits-lista[a].credits);
   // Una asignación factible sirve de cota superior y de respaldo para metas grandes.
   const esVac = t => cfg.vacaciones && t%2===0;
+  const horas = lista.map(c => horasCurso(s,c.id));
   const asignado = lista.map(()=>-1);
   let faltan=lista.length, t=0;
   while(faltan) {
-    let carga=0, cantidad=0;
+    let carga=0, horasUsadas=0;
     for(const i of orden) {
       if(asignado[i]>=0 || padres[i].some(p=>asignado[p]<0 || asignado[p]===t)) continue;
-      if(esVac(t) ? cantidad>=cfg.cupo : carga+lista[i].credits>max) continue;
-      asignado[i]=t; cantidad++; carga+=lista[i].credits; faltan--;
+      if(esVac(t) ? horasUsadas+horas[i]>4 : carga+lista[i].credits>max) continue;
+      asignado[i]=t; horasUsadas+=horas[i]; carga+=lista[i].credits; faltan--;
     }
     t++;
   }
@@ -60,14 +61,14 @@ function* explorarRutas(s, cfg) {
   for(let horizonte=Math.max(...largo);horizonte<t;horizonte++) {
     yield {propuesta:inicialFactible,horizonte,visitas};
     const puestos=lista.map(()=>-1);
-    const carga=Array(horizonte).fill(0), cantidad=Array(horizonte).fill(0);
+    const carga=Array(horizonte).fill(0), horasUsadas=Array(horizonte).fill(0);
     function* buscar(restantes) {
       if(!restantes) return true;
       if(++visitas%64===0) yield {horizonte,visitas};
       const desde=[], hasta=[], dominios=[];
       function cabeEn(i,j) {
         if(puestos[i]>=0) return puestos[i]===j;
-        return esVac(j) ? cantidad[j]<cfg.cupo : carga[j]+lista[i].credits<=max;
+        return esVac(j) ? horasUsadas[j]+horas[i]<=4 : carga[j]+lista[i].credits<=max;
       }
       // Propaga ambos extremos por el grafo antes de elegir la materia más restringida.
       for(let i=0;i<lista.length;i++) {
@@ -96,7 +97,7 @@ function* explorarRutas(s, cfg) {
         for(let b=a;b<horizonte;b++) {
           if(esVac(b)) {
             const pesos=lista.filter((c,i)=>puestos[i]<0 && dominios[i].includes(b)).map(c=>c.credits).sort((u,v)=>v-u);
-            capacidad+=pesos.slice(0,cfg.cupo-cantidad[b]).reduce((n,k)=>n+k,0);
+            capacidad+=pesos.slice(0,Math.floor((4-horasUsadas[b])/2)).reduce((n,k)=>n+k,0);
           } else capacidad+=max-carga[b];
           let exigida=0;
           for(let i=0;i<lista.length;i++) if(puestos[i]<0 && desde[i]>=a && hasta[i]<=b) exigida+=lista[i].credits;
@@ -104,9 +105,9 @@ function* explorarRutas(s, cfg) {
         }
       }
       for(const j of dominios[elegido]) {
-        puestos[elegido]=j; cantidad[j]++; carga[j]+=lista[elegido].credits;
+        puestos[elegido]=j; horasUsadas[j]+=horas[elegido]; carga[j]+=lista[elegido].credits;
         if(yield* buscar(restantes-1)) return true;
-        puestos[elegido]=-1; cantidad[j]--; carga[j]-=lista[elegido].credits;
+        puestos[elegido]=-1; horasUsadas[j]-=horas[elegido]; carga[j]-=lista[elegido].credits;
       }
       return false;
     }

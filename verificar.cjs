@@ -56,7 +56,14 @@ vm.runInContext(`
   anual.vacaciones = [];
   assert.deepEqual(evaluarCiclos(anual).map(c=>c.validos.length),[0,0,0]);
   anual.vacaciones = ["0101","0103"];
-  assert.deepEqual(evaluarCiclos(anual)[0].validos,["0101"]);
+  assert.deepEqual(evaluarCiclos(anual)[0].validos,[]);
+  const par = {...inicial(),vacaciones:["0005","0017"], horasVac:{"0005":2,"0017":2}};
+  assert.equal(evaluarCiclos(par)[0].validos.length,2);
+  assert.equal(evaluarCiclos({...par,horasVac:{"0005":4,"0017":2}})[0].validos.length,0);
+  assert.equal(evaluarCiclos({...par,vacaciones:[...par.vacaciones,"0101"],horasVac:{...par.horasVac,"0101":2}})[0].validos.length,0);
+  const perfilPar = {...par, rango:"medio", estados:Object.fromEntries(cursos.filter(c=>!par.vacaciones.includes(c.id)).map(c=>[c.id,"Aprobado"]))};
+  const rutaPar = calcularRuta(perfilPar,{meta:"dia",vacaciones:true});
+  assert.deepEqual(rutaPar.ciclos,[{tipo:"Vacaciones",ids:par.vacaciones}]);
   assert.throws(()=>validar(anual));
   const rutaFisica = redDelCurso("0150");
   assert.ok(rutaFisica.niveles.has("0101") && rutaFisica.niveles.has("0152"));

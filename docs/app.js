@@ -25,14 +25,14 @@ function tarjeta(c, paraPlan = false, contexto = s, esVacaciones = false) {
   const falta = faltantes(c,contexto);
   const dependeDePlan = paraPlan && c.req.some(id => s.estados[id] !== "Aprobado");
   const abre = !paraPlan && st === "Disponible" ? abreAlAprobar(c,s).length : 0;
-  const limitado = paraPlan && !esVacaciones && !cabe(c,contexto);
-  const etiqueta = paraPlan ? (limitado ? (limite(s) === null ? "Indica tu promedio" : "Supera el límite") : dependeDePlan ? "Condicional · añadir" : "Añadir al plan") : st;
+  const limitado = paraPlan && (esVacaciones ? horasCiclo(contexto,[...contexto.seleccion,c.id]) > 4 : !cabe(c,contexto));
+  const etiqueta = paraPlan ? (limitado ? (esVacaciones ? "Supera las 4 h" : limite(s) === null ? "Indica tu promedio" : "Supera el límite") : dependeDePlan ? "Condicional · añadir" : "Añadir al plan") : st;
   const pista = st === "Bloqueado" ? '<span class="requisitos"><b>Necesitas aprobar</b>'+falta.map(id => {
     const req = catalogo.get(id);
     const registro = s.estados[id] || "Pendiente";
     return '<span><em class="req-'+(registro === "Aprobado" ? "ok" : "falta")+'">'+registro+'</em> '+req.id+' · '+req.name+'</span>';
   }).join("")+'</span>' : "";
-  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><small class="tipo">${tipoCurso(c.id)}${laboratorios.has(c.id) ? " · Con laboratorio" : ""}</small><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
+  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><small class="tipo">${tipoCurso(c.id)}${esVacaciones ? " · "+etiquetaHoras(c.id) : ""}${laboratorios.has(c.id) ? " · Con laboratorio" : ""}</small><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
 }
 function mapa() {
   const q = normalizar($("buscar").value.trim()), f = $("filtro").value;
@@ -67,7 +67,19 @@ function mapa() {
   }).join("") || "<p>Ningún curso coincide con la búsqueda.</p>";
 }
 let cicloActivo = 1;
+function etiquetaHoras(id) {
+  return s.horasVac[id] ? s.horasVac[id]+" h" : "4 h reservadas (por confirmar)";
+}
+$("cursoHoras").innerHTML = cursos.map(c=>`<option value="${c.id}">${c.id} · ${c.name}</option>`).join("");
+$("cursoHoras").onchange = () => $("duracionVac").value = s.horasVac[$("cursoHoras").value] ?? "";
+$("duracionVac").onchange = () => {
+  const id = $("cursoHoras").value, valor = Number($("duracionVac").value);
+  if (valor) s.horasVac[id] = valor;
+  else delete s.horasVac[id];
+  guardar();
+};
 function planificar() {
+  $("cursoHoras").onchange();
   const ciclos = evaluarCiclos(s);
   cicloActivo = Math.min(cicloActivo,ciclos.length-1);
   const actual = ciclos[cicloActivo], vac = actual.tipo === "Vacaciones";
@@ -76,11 +88,11 @@ function planificar() {
     return `<div class="filaCiclo"><button data-ciclo="${i}" aria-pressed="${i === cicloActivo}"><b>${i+1}. ${c.tipo}</b> · ${c.carga} CLAR<small>${cursosPlan || "Sin cursos seleccionados"}</small></button>${i>=2 ? '<button data-borrar-ciclo="'+i+'" aria-label="Eliminar ciclo '+(i+1)+'">Eliminar</button>' : ""}</div>`;
   }).join("") + "<p><b>Total del plan: "+ciclos.reduce((n,c)=>n+c.carga,0)+" CLAR</b></p>";
   $("perfilCarga").hidden = false;
-  $("seleccion").innerHTML = `<h3>Ciclo ${cicloActivo+1} · ${actual.tipo}</h3><p>${actual.carga} CLAR${vac ? " · Confirma la oferta, horas y carga permitida en la convocatoria de vacaciones." : actual.max === null ? " · Elige tu rango de promedio." : " de "+actual.max+" · Saldo: "+(actual.max-actual.carga)+" CLAR"}</p>` +
+  $("seleccion").innerHTML = `<h3>Ciclo ${cicloActivo+1} · ${actual.tipo}</h3><p>${actual.carga} CLAR${vac ? " · "+horasCiclo(s,actual.ids)+" de 4 h"+(horasCiclo(s,actual.ids)>4 ? " · Supera el límite. Ajusta la selección para proyectar este período." : "") : actual.max === null ? " · Elige tu rango de promedio." : " de "+actual.max+" · Saldo: "+(actual.max-actual.carga)+" CLAR"}</p>` +
     actual.ids.map(id => {
       const c = catalogo.get(id), falta = faltantes(c,actual.previo,s.proyectar);
       const nota = actual.validos.includes(id) ? "Incluido en la proyección" : falta.length ? "Falta aprobar: "+falta.map(r=>catalogo.get(r).name).join(", ") : "Revisa el estado del curso o el límite de carga";
-      return `<div class="choice"><span><b>${c.name}</b> · ${c.credits} CLAR<br><small>${nota}</small></span><button data-quitar="${id}">Quitar</button></div>`;
+      return `<div class="choice"><span><b>${c.name}</b> · ${c.credits} CLAR<br><small>${vac ? etiquetaHoras(id)+" · " : ""}${nota}</small></span><button data-quitar="${id}">Quitar</button></div>`;
     }).join("");
   const usados = new Set(ciclos.flatMap(c=>c.ids));
   $("opciones").innerHTML = cursos.filter(c=>!usados.has(c.id) && elegible(c,actual.previo)).map(c=>tarjeta(c,true,actual.previo,vac)).join("") || "<p>No hay más cursos elegibles en este ciclo.</p>";
@@ -201,7 +213,7 @@ document.addEventListener("click",e => {
   }
   if (d.elegir) {
     const ciclos = evaluarCiclos(s), ciclo = ciclos[cicloActivo], c = catalogo.get(d.elegir);
-    if (elegible(c,ciclo.previo) && !ciclos.some(x => x.ids.includes(c.id)) && (ciclo.tipo === "Vacaciones" || cabe(c,ciclo.previo))) {
+    if (elegible(c,ciclo.previo) && !ciclos.some(x => x.ids.includes(c.id)) && (ciclo.tipo === "Vacaciones" ? horasCiclo(s,[...ciclo.ids,c.id]) <= 4 : cabe(c,ciclo.previo))) {
       ciclo.ids.push(c.id); guardar();
     }
   }
