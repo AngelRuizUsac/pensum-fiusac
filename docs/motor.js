@@ -79,8 +79,10 @@ function redPosterior(id, completa) {
   return {niveles,aristas};
 }
 
+// Horas diarias de teoría, Escuela de Vacaciones 2026. Computación 1 corresponde a junio.
+const horasPublicadas = {"0101":4,"0103":4,"0107":4,"0112":2,"0114":2,"0116":2,"0118":2,"0147":2,"0150":2,"0152":2,"0960":2};
 function horasCurso(s,id) {
-  return s.horasVac?.[id] ?? 4;
+  return s.horasVac?.[id] ?? horasPublicadas[id] ?? 4;
 }
 function horasCiclo(s,ids) {
   return ids.reduce((total,id) => total + horasCurso(s,id), 0);

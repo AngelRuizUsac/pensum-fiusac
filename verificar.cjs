@@ -82,7 +82,7 @@ vm.runInContext(`
     const ruta = calcularRuta(perfilAuto,cfg,25);
     const hechos = new Set();
     for (const ciclo of ruta.ciclos) {
-      if (ciclo.tipo==="Vacaciones") assert.ok(vacaciones && ciclo.ids.length<=cfg.cupo);
+      if (ciclo.tipo==="Vacaciones") assert.ok(vacaciones && horasCiclo(perfilAuto,ciclo.ids)<=4);
       else assert.ok(sumar(ciclo.ids.map(id=>catalogo.get(id)))<=32);
       for(const id of ciclo.ids) assert.ok(!hechos.has(id) && catalogo.get(id).req.every(p=>hechos.has(p)));
       ciclo.ids.forEach(id=>hechos.add(id));
@@ -99,12 +99,21 @@ vm.runInContext(`
     esperados.forEach(id=>perfil.estados[id]="Aprobado");
     assert.equal(calcularRuta(perfil,{...opcionesAuto,meta:"obligatorios",seminario,vacaciones}).ciclos.length,0);
   }
-  const busquedaExacta=explorarRutas({...inicial(),rango:"medio"},{...opcionesAuto,meta:"obligatorios",vacaciones:true,cupo:1});
+  const busquedaExacta=explorarRutas({...inicial(),rango:"medio",horasVac:Object.fromEntries(cursos.map(c=>[c.id,4]))},{...opcionesAuto,meta:"obligatorios",vacaciones:true,cupo:1});
   let pasoExacto=busquedaExacta.next();
   const cotaInicial=pasoExacto.value.propuesta.ciclos.length;
   while(!pasoExacto.done) pasoExacto=busquedaExacta.next();
   assert.ok(pasoExacto.value.minima && pasoExacto.value.ciclos.length<cotaInicial);
   assert.equal(pasoExacto.value.ciclos.length,15);
+  assert.equal(horasCiclo(inicial(),["0112","0152"]),4);
+  assert.equal(horasCiclo(inicial(),["0103","0152"]),6);
+  const optativo=cursos.find(c=>!c.obligatorio && !["0799","7999"].includes(c.id));
+  const dos={...perfilAuto,estados:Object.fromEntries(cursos.filter(c=>!["0005",optativo.id].includes(c.id)).map(c=>[c.id,"Aprobado"]))};
+  const fases={...opcionesAuto,meta:"fases"};
+  assert.deepEqual(calcularRuta(dos,fases).ciclos.map(c=>c.ids),[["0005"],[optativo.id]]);
+  assert.equal(calcularRuta(dos,{...fases,extras:true}).ciclos.length,1);
+  assert.throws(()=>calcularRuta(perfilAuto,{...opcionesAuto,maximo:33}));
+  assert.throws(()=>calcularRuta(perfilAuto,{...opcionesAuto,maximo:1}));
   const mb2 = catalogo.get("0103");
   assert.equal(estado(mb2,s),"Bloqueado");
   s.estados["0101"] = "En curso";
