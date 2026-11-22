@@ -16,9 +16,21 @@ if(window.parent!==window && document.referrer && new URL(document.referrer).ori
     window.notificarPeriodo=valor=>parent.periodoDesdeGenerador(valor);
     let config={};
     try{config=JSON.parse(localStorage.getItem("nhc")||"{}")||{};}catch{}
+    const ganados=new Set(perfil.labsGanados);
+    const firma=JSON.stringify([...ganados].sort());
+    if((config.labsGanadosFIUSAC||"[]")!==firma){
+      config.miHorario=null;config.vista=null;
+    }
+    config.labsGanadosFIUSAC=firma;
     const favoritas=new Set(perfil.preferidas);
     window.ordenarPorPreferencia=datos=>{
       for(const c of datos.cursos||[]){
+        c.secciones=c.secciones.filter(fila=>{
+          const tipo=parent.tipoComponente(fila.categoria);
+          if(tipo==="Laboratorio") parent.registrarLaboratorioOfertado(c.codigo);
+          fila.categoria=tipo==="Teoría"?null:tipo==="Trabajo dirigido"?"Trabajo Dirigido":tipo;
+          return tipo!=="Laboratorio" || !ganados.has(c.codigo);
+        });
         const preferida=k=>favoritas.has(c.codigo+"/"+(k.categoria==="Trabajo Dirigido"?"Trabajo dirigido":k.categoria||"Teoría")+"/"+k.seccion);
         c.secciones.sort((a,b)=>Number(preferida(b))-Number(preferida(a)));
       }

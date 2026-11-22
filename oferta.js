@@ -9,10 +9,13 @@ function leer(html,periodo) {
     const celdas = [...fila[1].matchAll(/<td\b[^>]*>(.*?)<\/td>/gis)].map(m=>m[1]);
     if (!celdas.length) continue;
     const campo = nombre=>limpio(celdas[columnas.indexOf(nombre)] ?? "");
-    const id = campo("Nombre de Curso").split(" ")[0];
+    const id = campo("Nombre de Curso").match(/^\d+/)?.[0].padStart(4,"0");
     if (!catalogo.has(id)) continue;
-    const clase = celdas[0].match(/badge-(blue|info|success|danger)\b/i)?.[1];
-    const tipo = ({blue:"Laboratorio",info:"Trabajo dirigido",success:"Dibujo",danger:"Práctica"})[clase] ?? "Teoría";
+    const categoria = campo("Categoría") || campo("Tipo");
+    const insignias = celdas.join(" ").match(/<(?:span|i)\b[^>]*class=["'][^"']*\bbadge\b[^"']*["'][^>]*>[\s\S]*?<\/(?:span|i)>/gi) || [];
+    const etiqueta = insignias.map(limpio).map(tipoComponente).find(t=>["Laboratorio","Trabajo dirigido","Dibujo","Práctica"].includes(t));
+    const clase = (celdas[0]+" "+insignias.join(" ")).match(/badge-(blue|info|success|danger)\b/i)?.[1];
+    const tipo = categoria ? tipoComponente(categoria) : etiqueta ?? ({blue:"Laboratorio",info:"Trabajo dirigido",success:"Dibujo",danger:"Práctica"})[clase] ?? "Teoría";
     const sec = campo("Sección"), clave = [id,tipo,sec].join("/");
     const dias = campo("Días").split(/\s+/).filter(Boolean);
     const inicio = campo("Inicio"), fin = campo("Final");
@@ -51,7 +54,7 @@ function catalogoNoHayCupo(datos,codigo) {
     if(!catalogo.has(curso.codigo)) continue;
     for(const fila of curso.secciones) {
       if(!fila.inicio || !fila.fin || fila.inicio>=fila.fin || !Array.isArray(fila.dias) || !fila.dias.length) continue;
-      const tipo=fila.categoria==="Trabajo Dirigido"?"Trabajo dirigido":fila.categoria||"Teoría";
+      const tipo=tipoComponente(fila.categoria);
       const clave=[curso.codigo,tipo,fila.seccion].join("/");
       if(!grupos.has(clave)) grupos.set(clave,{clave,id:curso.codigo,tipo,sec:fila.seccion,bloques:[],restricciones:false});
       const grupo=grupos.get(clave);
@@ -80,6 +83,7 @@ async function cargarOferta(periodo,forzar=false) {
           datos.horas.set(sec.id,Math.max(datos.horas.get(sec.id)||0,cargaSeccion(sec)));
         }
         if(!datos.horas.size) continue;
+        for (const sec of datos.secciones) if (sec.tipo==="Laboratorio") laboratoriosOfertados.add(sec.id);
         ofertas.set(periodo,datos);
         return datos;
       } catch {}

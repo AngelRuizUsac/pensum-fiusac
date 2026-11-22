@@ -118,6 +118,7 @@ $("generarHorario").onclick=()=>{
     const tipos=new Set(secciones.map(x=>x.tipo));
     if(!tipos.has("Teoría")){salida.textContent=catalogo.get(id).name+" carece de sección de teoría publicada para este período.";return;}
     for(const tipo of tipos){
+      if(tipo==="Laboratorio" && s.labsGanados.includes(id)) continue;
       if(tipo!=="Teoría" && !$("incluirLab").checked) continue;
       const candidatas=secciones.filter(x=>x.tipo===tipo && x.bloques.every(b=>(!desde || b.inicio>=desde) && (!hasta || b.fin<=hasta) && !b.dias.some(d=>libres.has(d)) && !/CERRAD/i.test(b.lugar)));
       if(!candidatas.length){salida.textContent=catalogo.get(id).name+" · "+tipo+" no tiene secciones dentro de tu disponibilidad.";return;}
