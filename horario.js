@@ -2,7 +2,7 @@
 const diasSemana={LU:"Lunes",MA:"Martes",MI:"Miércoles",JU:"Jueves",VI:"Viernes",SA:"Sábado",DO:"Domingo"};
 const escHorario=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 let ofertaVista=null, periodoVista="", revisionHorario=0, elegidas=new Set();
-function llaveHorario(){return planId+"-horario-"+periodoVista+"-"+ofertaVista.anio;}
+function llaveHorario(){return planId+"-horario-"+periodoVista+"-"+(ofertaVista.anio??"referencia");}
 function cruzan(a,b) {
   return a.bloques.some(x=>b.bloques.some(y=>x.inicio<y.fin && y.inicio<x.fin && x.dias.some(d=>y.dias.includes(d))));
 }
@@ -37,7 +37,7 @@ async function abrirHorario(forzar=false) {
     if(turno!==revisionHorario) return;
     periodoVista=periodo; ofertaVista=datos;
     try { elegidas=new Set(JSON.parse(localStorage.getItem(llaveHorario())||"[]")); } catch { elegidas=new Set(); }
-    $("estadoHorario").textContent=nota+nombresPeriodo[periodo]+" "+datos.anio+" · "+(periodo===fecha.actual && datos.anio===fecha.anio?"Período actual":"Horario de referencia");
+    $("estadoHorario").textContent=nota+nombresPeriodo[periodo]+" "+(datos.anio??"(año sin verificar)")+" · "+(datos.fuente?"Catálogo de "+datos.fuente+" · ":"")+(periodo===fecha.actual && datos.anio===fecha.anio?"Período actual":"Horario de referencia");
     $("fuenteHorario").href="https://usuarios.ingenieria.usac.edu.gt/horarios/"+periodo;
     dibujarHorario();
   } catch {
