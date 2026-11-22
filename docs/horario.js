@@ -21,6 +21,7 @@ function razonHorario(sec,seleccion) {
 async function abrirHorario(forzar=false) {
   const turno=++revisionHorario, fecha=calendario(), solicitado=$("periodoHorario").value;
   let periodo=solicitado||fecha.actual, nota="";
+  cancelarComparacion();
   ofertaVista=null; $("agenda").replaceChildren(); $("secciones").replaceChildren();
   $("estadoHorario").textContent="Consultando el horario oficial…";
   try {
@@ -39,7 +40,7 @@ async function abrirHorario(forzar=false) {
     try { elegidas=new Set(JSON.parse(localStorage.getItem(llaveHorario())||"[]")); } catch { elegidas=new Set(); }
     $("estadoHorario").textContent=nota+nombresPeriodo[periodo]+" "+(datos.anio??"(año sin verificar)")+" · "+(datos.fuente?"Catálogo de "+datos.fuente+" · ":"")+(periodo===fecha.actual && datos.anio===fecha.anio?"Período actual":"Horario de referencia");
     $("fuenteHorario").href="https://usuarios.ingenieria.usac.edu.gt/horarios/"+periodo;
-    dibujarHorario();
+    prepararComparador();dibujarHorario();
   } catch {
     if(turno===revisionHorario) $("estadoHorario").textContent="No se pudo leer el horario. Reintenta o elige otro período.";
   }
@@ -53,7 +54,7 @@ function dibujarHorario() {
   const boton=(x,t,des=false)=>'<button data-seccion="'+escHorario(x.clave)+'" '+(des?"disabled":"")+'>'+escHorario(t)+'</button>';
   $("secciones").innerHTML=filas.map(x=>{
     const dentro=elegidas.has(x.clave), razon=dentro?"":razonHorario(x,seleccion);
-    return '<article class="planbox"><strong>'+nombre(x)+'</strong>'+x.bloques.map(b=>'<p>'+escHorario(b.dias.join(" ")+" · "+b.inicio+"–"+b.fin+" · "+b.lugar)+'<br>'+escHorario("Docente: "+b.docente+" · Auxiliar: "+b.auxiliar)+'</p>').join("")+(x.restricciones?"<p>Ver restricciones en el horario oficial.</p>":"")+boton(x,dentro?"Quitar":razon||"Agregar",!!razon)+'</article>';
+    return '<article class="planbox"><strong>'+nombre(x)+'</strong>'+x.bloques.map(b=>'<p>'+escHorario(b.dias.join(" ")+" · "+b.inicio+"–"+b.fin+" · "+b.lugar)+'<br>'+escHorario("Docente: "+b.docente+" · Auxiliar: "+b.auxiliar)+'</p>').join("")+(x.restricciones?"<p>Ver restricciones en el horario oficial.</p>":"")+'<button data-preferida="'+escHorario(x.clave)+'" aria-pressed="'+favoritas.has(x.clave)+'">'+(favoritas.has(x.clave)?'★ Preferida':'☆ Preferir sección')+'</button> '+boton(x,dentro?"Quitar":razon||"Agregar",!!razon)+'</article>';
   }).join("")||"<p>Sin secciones para estos filtros.</p>";
   const dias=Object.entries(diasSemana).map(([id,d])=>{
     const bloques=seleccion.flatMap(x=>x.bloques.filter(b=>b.dias.includes(id)).map(b=>({x,b}))).sort((a,b)=>a.b.inicio.localeCompare(b.b.inicio));
