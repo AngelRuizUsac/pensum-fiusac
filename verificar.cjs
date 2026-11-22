@@ -149,3 +149,21 @@ vm.runInContext(`
   assert.equal(permiteVac(inicial(),"0103",1),true);
   assert.equal(permiteVac(inicial(),"0101",1),false);
 `,entorno);
+
+// Integración del motor MIT con bloques distintos de una misma sección.
+const entornoHorario = vm.createContext({assert,matchMedia:()=>({matches:false,addEventListener(){}}),
+  document:{documentElement:{dataset:{}},addEventListener(){}},
+  $:()=>({addEventListener(){},innerHTML:""})});
+for(const archivo of ["vendor/nohaycupo/motor","cursos","motor","oferta","interfaz","horario","combinaciones"]){
+  vm.runInContext(fs.readFileSync(path.join(__dirname,"docs",archivo+".js"),"utf8"),entornoHorario);
+}
+vm.runInContext(`
+  const base={id:"0112",clave:"0112/Teoría/A",sec:"A",tipo:"Teoría",bloques:[{inicio:"07:00",fin:"09:00",dias:["LU"]}]};
+  const otro={...base,id:"0150",clave:"0150/Teoría/B",sec:"B",bloques:[{inicio:"09:00",fin:"11:00",dias:["LU"]}]};
+  const cruce={...otro,clave:"0150/Teoría/C",bloques:[...otro.bloques,{inicio:"08:00",fin:"10:00",dias:["LU"]}]};
+  const res=combinarSecciones([[base],[otro,cruce]],new Set([otro.clave]),"dias",(x,ys)=>ys.every(y=>!cruzan(x,y))).next().value;
+  assert.equal(res.total,1);
+  assert.equal(res.mejores[0].metrica.preferidas,1);
+  assert.equal((grillaSemanal(res.mejores[0].secciones).match(/class="evento"/g)||[]).length,2);
+  temaElegido="oscuro"; aplicarTema();assert.equal(document.documentElement.dataset.tema,"oscuro");
+`,entornoHorario);

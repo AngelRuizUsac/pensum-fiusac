@@ -23,11 +23,24 @@ function* combinarSecciones(grupos,favoritas,criterio,admite,presupuesto=150000)
     const principal=criterio==="entrada"?y.entrada-x.entrada:x[criterio]-y[criterio];
     return y.preferidas-x.preferidas || principal || x.huecos-y.huecos || x.dias-y.dias || x.salida-y.salida;
   }
+  function registrar(secciones){
+    total++;
+    mejores.push({secciones:[...secciones],metrica:medirSemana(secciones,favoritas)});
+    mejores.sort(ordenar);
+    if(mejores.length>5) mejores.pop();
+  }
+  // En búsquedas pequeñas el motor original puede enumerar todas las opciones de inmediato.
+  if(opciones.reduce((n,g)=>n*g.length,1)<=1000){
+    const requisitos=opciones.map((grupo,i)=>[String(i),grupo.map(sec=>({sec,componentes:sesionesHorario(sec).map(sesion=>({sesion}))}))]);
+    for(const combo of NoHayCupo.findAllValidCombinations(requisitos)){
+      const secciones=combo.map(([,op])=>op.sec);
+      if(secciones.every((sec,i)=>admite(sec,secciones.slice(0,i)))) registrar(secciones);
+    }
+    return {mejores,total,limitada};
+  }
   function* explorar(i){
     if(i===opciones.length){
-      total++;
-      const resultado={secciones:[...parcial],metrica:medirSemana(parcial,favoritas)};
-      mejores.push(resultado); mejores.sort(ordenar); if(mejores.length>5) mejores.pop();
+      registrar(parcial);
       return;
     }
     for(const sec of opciones[i]){
@@ -122,7 +135,7 @@ $("generarHorario").onclick=()=>{
       const r=paso.value;alternativas=r.mejores;
       salida.innerHTML='<p>'+r.total+' horarios compatibles encontrados. '+(r.limitada?'Búsqueda parcial por cantidad de combinaciones. ':'')+(r.total?'Mostrando '+alternativas.length+'.':'Revisa tus cursos, días libres o límites de carga.')+'</p>'+alternativas.map((a,i)=>{
         const m=a.metrica;
-        return '<details class="planbox" '+(!i?'open':'')+'><summary>Opción '+(i+1)+' · '+m.preferidas+' preferidas · '+m.dias+' días · '+m.huecos+' min libres entre clases</summary><p>Primera entrada '+reloj(m.entrada)+' · Última salida '+reloj(m.salida)+'</p>'+a.secciones.map(x=>'<p><b>'+escHorario(catalogo.get(x.id).name+" · "+x.tipo+" "+x.sec)+'</b>'+x.bloques.map(b=>'<br>'+escHorario(b.dias.join(" ")+" "+b.inicio+"–"+b.fin+" · "+b.docente+" · Auxiliar: "+b.auxiliar)).join("")+'</p>').join("")+'<button class="primary" data-aplicar-horario="'+i+'">Usar este horario</button></details>';
+        return '<details class="planbox" '+(!i?'open':'')+'><summary>Opción '+(i+1)+' · '+m.preferidas+' preferidas · '+m.dias+' días · '+m.huecos+' min libres entre clases</summary><p>Primera entrada '+reloj(m.entrada)+' · Última salida '+reloj(m.salida)+'</p>'+a.secciones.map(x=>'<p><b>'+escHorario(catalogo.get(x.id).name+" · "+x.tipo+" "+x.sec)+'</b>'+x.bloques.map(b=>'<br>'+escHorario(b.dias.join(" ")+" "+b.inicio+"–"+b.fin+" · "+b.docente+" · Auxiliar: "+b.auxiliar)).join("")+'</p>').join("")+grillaSemanal(a.secciones)+'<button class="primary" data-aplicar-horario="'+i+'">Usar este horario</button></details>';
       }).join("");return;
     }while(performance.now()<fin);
     setTimeout(avanzar,0);

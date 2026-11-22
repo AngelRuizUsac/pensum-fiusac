@@ -3,8 +3,13 @@ const diasSemana={LU:"Lunes",MA:"Martes",MI:"Miércoles",JU:"Jueves",VI:"Viernes
 const escHorario=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 let ofertaVista=null, periodoVista="", revisionHorario=0, elegidas=new Set();
 function llaveHorario(){return planId+"-horario-"+periodoVista+"-"+(ofertaVista.anio??"referencia");}
-function cruzan(a,b) {
-  return a.bloques.some(x=>b.bloques.some(y=>x.inicio<y.fin && y.inicio<x.fin && x.dias.some(d=>y.dias.includes(d))));
+const sesionesPorSeccion=new WeakMap();
+function sesionesHorario(sec){
+  if(!sesionesPorSeccion.has(sec)) sesionesPorSeccion.set(sec,sec.bloques.map(b=>({dias:b.dias,inicio_min:NoHayCupo.hhmmToMin(b.inicio),fin_min:NoHayCupo.hhmmToMin(b.fin)})));
+  return sesionesPorSeccion.get(sec);
+}
+function cruzan(a,b){
+  return NoHayCupo.sesionesSeTraslapan(sesionesHorario(a),sesionesHorario(b));
 }
 function razonHorario(sec,seleccion) {
   if(sec.bloques.some(b=>/CERRAD/i.test(b.lugar))) return "Sección cerrada";
@@ -56,11 +61,7 @@ function dibujarHorario() {
     const dentro=elegidas.has(x.clave), razon=dentro?"":razonHorario(x,seleccion);
     return '<article class="planbox"><strong>'+nombre(x)+'</strong>'+x.bloques.map(b=>'<p>'+escHorario(b.dias.join(" ")+" · "+b.inicio+"–"+b.fin+" · "+b.lugar)+'<br>'+escHorario("Docente: "+b.docente+" · Auxiliar: "+b.auxiliar)+'</p>').join("")+(x.restricciones?"<p>Ver restricciones en el horario oficial.</p>":"")+'<button data-preferida="'+escHorario(x.clave)+'" aria-pressed="'+favoritas.has(x.clave)+'">'+(favoritas.has(x.clave)?'★ Preferida':'☆ Preferir sección')+'</button> '+boton(x,dentro?"Quitar":razon||"Agregar",!!razon)+'</article>';
   }).join("")||"<p>Sin secciones para estos filtros.</p>";
-  const dias=Object.entries(diasSemana).map(([id,d])=>{
-    const bloques=seleccion.flatMap(x=>x.bloques.filter(b=>b.dias.includes(id)).map(b=>({x,b}))).sort((a,b)=>a.b.inicio.localeCompare(b.b.inicio));
-    return bloques.length?'<section class="planbox"><h4>'+d+'</h4>'+bloques.map(({x,b})=>'<p><b>'+escHorario(b.inicio+"–"+b.fin)+'</b> '+nombre(x)+'<br>'+escHorario(b.lugar)+'</p>').join("")+'</section>':"";
-  });
-  $("agenda").innerHTML=seleccion.length?'<p>'+seleccion.length+' secciones · '+sumar(seleccion.filter(x=>x.tipo==="Teoría").map(x=>catalogo.get(x.id)))+' CLAR</p><div class="grid">'+dias.join("")+'</div>'+seleccion.map(x=>boton(x,"Quitar "+x.id+" "+x.sec)).join(" "):"<p>Agrega una sección para verla en tu semana.</p>";
+  $("agenda").innerHTML=(seleccion.length?'<p>'+seleccion.length+' secciones · '+sumar(seleccion.filter(x=>x.tipo==="Teoría").map(x=>catalogo.get(x.id)))+' CLAR</p>':"<p>Agrega una sección o aplica un horario para ver tu semana.</p>")+grillaSemanal(seleccion)+seleccion.map(x=>boton(x,"Quitar "+x.id+" "+x.sec)).join(" ");
 }
 $("horario").addEventListener("click",e=>{
   const clave=e.target.closest("[data-seccion]")?.dataset.seccion;
