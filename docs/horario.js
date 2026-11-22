@@ -14,6 +14,7 @@ function cruzan(a,b){
   return NoHayCupo.sesionesSeTraslapan(sesionesHorario(a),sesionesHorario(b));
 }
 function razonHorario(sec,seleccion) {
+  if(sec.tipo==="Laboratorio" && s.labsGanados.includes(sec.id)) return "Laboratorio ganado";
   if(sec.bloques.some(b=>/CERRAD/i.test(b.lugar))) return "Sección cerrada";
   if(seleccion.some(x=>x.id===sec.id && x.tipo===sec.tipo)) return "Ya elegiste otra sección";
   const cruce=seleccion.find(x=>cruzan(sec,x));
@@ -56,6 +57,9 @@ async function abrirHorario(forzar=false) {
 }
 function dibujarHorario() {
   if(!ofertaVista) return;
+  let cambio=false;
+  for(const sec of ofertaVista.secciones) if(sec.tipo==="Laboratorio" && s.labsGanados.includes(sec.id) && elegidas.delete(sec.clave)) cambio=true;
+  if(cambio) try{localStorage.setItem(llaveHorario(),JSON.stringify([...elegidas]));}catch{avisar("No se pudo guardar tu selección.");}
   const seleccion=ofertaVista.secciones.filter(x=>elegidas.has(x.clave));
   const q=normalizar($("filtroHorario").value.trim()), dia=$("diaHorario").value;
   const perfil=perfilDelHorario();
@@ -89,3 +93,15 @@ $("filtroHorario").oninput=dibujarHorario;
 $("diaHorario").onchange=dibujarHorario;
 $("soloElegibles").onchange=dibujarHorario;
 $("diaHorario").innerHTML+=Object.entries(diasSemana).map(([id,d])=>'<option value="'+id+'">'+d+'</option>').join("");
+
+document.addEventListener("change",e=>{
+  const id=e.target.dataset.labGanado;
+  if(!id || !catalogo.has(id)) return;
+  s.labsGanados=s.labsGanados.filter(codigo=>codigo!==id);
+  if(e.target.checked) s.labsGanados.push(id);
+  guardar();
+  cancelarComparacion();
+  dibujarHorario();
+  if($("detalle").open) detalle(id);
+  if($("originalHorario").hasAttribute("src")) abrirOriginal(true);
+});

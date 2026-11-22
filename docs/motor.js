@@ -2,7 +2,7 @@
 const planId = "fiusac-sistemas-28-clar";
 const catalogo = new Map(cursos.map(c => [c.id, c]));
 function inicial() {
-  return {plan: planId, version: 1, horasVac: {}, noConfirmados:false, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], vacaciones: [], posteriores: [], proyectar: false};
+  return {plan: planId, version: 1, labsGanados: [], horasVac: {}, noConfirmados:false, rango:"", doble:false, semestre: 1, estados: {}, seleccion: [], vacaciones: [], posteriores: [], proyectar: false};
 }
 function validar(s) {
   const estadosValidos = ["Aprobado", "En curso"];
@@ -15,12 +15,14 @@ function validar(s) {
   if (s.rango !== undefined && !["","bajo","medio","alto"].includes(s.rango) || s.doble !== undefined && typeof s.doble !== "boolean") throw Error("Perfil académico inválido.");
   const vacaciones = s.vacaciones ?? [], posteriores = s.posteriores ?? [];
   const listaValida = ids => Array.isArray(ids) && ids.every(id => catalogo.has(id)) && new Set(ids).size === ids.length;
+  const labsGanados = s.labsGanados ?? [];
+  if (!listaValida(labsGanados)) throw Error("Registro de laboratorios inválido.");
   if (!listaValida(vacaciones) || !Array.isArray(posteriores) || !posteriores.every(c => c && ["Semestre","Vacaciones"].includes(c.tipo) && listaValida(c.ids))) throw Error("Ciclos incompatibles.");
   const horasVac = s.horasVac ?? {};
   if (typeof horasVac !== "object" || Array.isArray(horasVac) || !Object.entries(horasVac).every(([id,h]) => catalogo.has(id) && [2,4].includes(h))) throw Error("Duración de vacaciones inválida.");
   const idsPlan = [...vacaciones,...s.seleccion,...posteriores.flatMap(c => c.ids)];
   if (new Set(idsPlan).size !== idsPlan.length) throw Error("Curso repetido en el plan.");
-  return {...inicial(), horasVac:{...horasVac}, noConfirmados:s.noConfirmados===true, vacaciones:[...vacaciones], posteriores:posteriores.map(c => ({tipo:c.tipo,ids:[...c.ids]})), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
+  return {...inicial(), labsGanados:[...labsGanados], horasVac:{...horasVac}, noConfirmados:s.noConfirmados===true, vacaciones:[...vacaciones], posteriores:posteriores.map(c => ({tipo:c.tipo,ids:[...c.ids]})), rango:s.rango ?? "", doble:s.doble ?? false, semestre:s.semestre, estados:{...s.estados}, seleccion:[...s.seleccion], proyectar:s.proyectar};
 }
 function faltantes(c, s, proyectar = false) {
   return c.req.filter(id => s.estados[id] !== "Aprobado" && !(proyectar && s.estados[id] === "En curso"));

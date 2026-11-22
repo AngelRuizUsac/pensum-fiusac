@@ -25,7 +25,7 @@ function agruparCatalogo(filas,tarjeta){
   $("cuentaCursos").textContent=grupos.size+" cursos";
   $("secciones").innerHTML=[...grupos].sort(([a],[b])=>a.localeCompare(b)).map(([id,secciones])=>{
     const modalidades=new Set(secciones.flatMap(x=>x.bloques.map(b=>b.lugar.split(" · ")[0])).filter(Boolean));
-    return '<details data-grupo="'+id+'" '+(abiertos.has(id)?"open":"")+'><summary><span><small>'+id+'</small> <b>'+escHorario(catalogo.get(id).name)+'</b><em>'+secciones.length+' secciones · '+escHorario([...modalidades].join(" / "))+'</em></span></summary>'+secciones.map(tarjeta).join("")+'</details>';
+    return '<details data-grupo="'+id+'" '+(abiertos.has(id)?"open":"")+'><summary><span><small>'+id+'</small> <b>'+escHorario(catalogo.get(id).name)+'</b><em>'+secciones.length+' secciones · '+escHorario([...new Set(secciones.map(x=>x.tipo))].join(" / "))+" · "+escHorario([...modalidades].join(" / "))+'</em></span></summary>'+(tieneLaboratorio(id)?controlLaboratorio(id):'')+secciones.map(tarjeta).join("")+'</details>';
   }).join("")||"<p>Sin cursos para estos filtros.</p>";
 }
 
@@ -45,7 +45,7 @@ function abrirPerfil(rapido){
   $("semestrePerfil").value=rapido && !perfilRapido?"auto":String(perfil.semestre);
   $("promedioPerfil").value=perfil.rango;
   $("aplicarPerfil").textContent=rapido?"Proponer cursos":"Guardar mi pénsum";
-  $("materiasPerfil").innerHTML=semestres.map(n=>'<details '+(n===perfil.semestre?"open":"")+'><summary>Semestre '+n+'</summary>'+cursos.filter(c=>c.semester===n).map(c=>'<label><input type="checkbox" data-aprobada="'+c.id+'" '+(perfil.estados[c.id]==="Aprobado"?"checked":"")+'> '+c.id+' · '+escHorario(c.name)+'</label>').join("")+'</details>').join("");
+  $("materiasPerfil").innerHTML=semestres.map(n=>'<details '+(n===perfil.semestre?"open":"")+'><summary>Semestre '+n+'</summary>'+cursos.filter(c=>c.semester===n).map(c=>'<label><input type="checkbox" data-aprobada="'+c.id+'" '+(perfil.estados[c.id]==="Aprobado"?"checked":"")+'> '+c.id+' · '+escHorario(c.name)+'</label>'+(!rapido && tieneLaboratorio(c.id)?'<label><input type="checkbox" data-lab-perfil="'+c.id+'" '+(s.labsGanados.includes(c.id)?"checked":"")+'> Laboratorio ganado · '+escHorario(c.name)+'</label>':"")).join("")+'</details>').join("");
   resumenBorrador();$("perfilHorario").showModal();
 }
 function resumenBorrador(){
@@ -96,8 +96,9 @@ $("formPerfil").onsubmit=e=>{
     $("perfilActivo").hidden=false;$("notaRapida").textContent="Semestre "+perfilRapido.semestre+" · Esperando la oferta.";
     $("soloElegibles").checked=true;aplicarSugerenciaPendiente();
   }else{
+    s.labsGanados=[...$("materiasPerfil").querySelectorAll("[data-lab-perfil]:checked")].map(input=>input.dataset.labPerfil);
     s.semestre=borradorPerfil.semestre;s.estados=borradorPerfil.estados;s.rango=borradorPerfil.rango;
-    perfilRapido=null;pendienteSugerencia=false;$("perfilActivo").hidden=true;guardar();cancelarComparacion();listaDeseados();
+    perfilRapido=null;pendienteSugerencia=false;$("perfilActivo").hidden=true;guardar();cancelarComparacion();listaDeseados();if($("originalHorario").hasAttribute("src")) abrirOriginal(true);
   }
   $("perfilHorario").close();dibujarHorario();
 };
@@ -110,7 +111,7 @@ function codigoPeriodoOriginal(){
 function contextoAutomatico(){
   const perfil=perfilDelHorario(),cursos=cursosParaOriginal;
   cursosParaOriginal=null;
-  return {preferidas:[...favoritas],periodo:codigoPeriodoOriginal(),tema:document.documentElement.dataset.tema==="oscuro"?"dark":"light",cursos,
+  return {labsGanados:[...s.labsGanados],preferidas:[...favoritas],periodo:codigoPeriodoOriginal(),tema:document.documentElement.dataset.tema==="oscuro"?"dark":"light",cursos,
     aprobados:Object.entries(perfil.estados).filter(([,e])=>e==="Aprobado").map(([id])=>id)};
 }
 function validarCargaAutomatica(ids,periodo){
@@ -125,7 +126,7 @@ function abrirOriginal(forzar=false){
   const marco=$("originalHorario"),periodo=codigoPeriodoOriginal();
   if(!marco.hasAttribute("src") || periodo!==ultimoPeriodoOriginal || forzar){
     if(!marco.hasAttribute("src") && cursosParaOriginal===null && deseados.size)cursosParaOriginal=[...deseados];
-    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=19";
+    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=20";
   }
 }
 function iniciarOriginalCon(ids){cursosParaOriginal=ids;abrirOriginal(true);}

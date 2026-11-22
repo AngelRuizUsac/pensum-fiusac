@@ -10,3 +10,22 @@ for (const [id,titulo,url] of [
   ["0601","Laboratorio de Investigación de Operaciones I","https://emi.ingenieria.usac.edu.gt/wp-content/uploads/2019/06/IO1p.pdf"],
   ["0603","Laboratorio de Investigación de Operaciones II","https://emi.ingenieria.usac.edu.gt/wp-content/uploads/2019/06/LABORATORIOI-DE-INVESTIGACION-DE-OPERACIONES-II.pdf"]
 ]) laboratorios.set(id,{titulo,url});
+
+function tipoComponente(valor) {
+  const tipo = String(valor ?? "").trim();
+  const clave = tipo.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  if (!clave || /^(clase|teoria|catedra)$/.test(clave)) return "Teoría";
+  if (/^(lab\.?|laboratorio)s?$/.test(clave)) return "Laboratorio";
+  if (/^trabajo dirigido$/.test(clave)) return "Trabajo dirigido";
+  if (/^practica$/.test(clave)) return "Práctica";
+  if (/^dibujo$/.test(clave)) return "Dibujo";
+  return tipo;
+}
+const laboratoriosOfertados = new Set();
+function tieneLaboratorio(id) {
+  return laboratorios.has(id) || laboratoriosOfertados.has(id) || s.labsGanados.includes(id);
+}
+function controlLaboratorio(id) {
+  return '<label><input type="checkbox" data-lab-ganado="'+id+'" '+(s.labsGanados.includes(id)?"checked":"")+'> Laboratorio ganado</label>';
+}
+function registrarLaboratorioOfertado(id) { if(catalogo.has(id)) laboratoriosOfertados.add(id); }

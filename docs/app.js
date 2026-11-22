@@ -32,11 +32,11 @@ function tarjeta(c, paraPlan = false, contexto = s, esVacaciones = false) {
     const registro = s.estados[id] || "Pendiente";
     return '<span><em class="req-'+(registro === "Aprobado" ? "ok" : "falta")+'">'+registro+'</em> '+req.id+' · '+req.name+'</span>';
   }).join("")+'</span>' : "";
-  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><small class="tipo">${tipoCurso(c.id)}${esVacaciones ? " · "+etiquetaHoras(c.id,contexto.indiceVac)+" · "+estadoOferta(c.id,contexto.indiceVac) : ""}${laboratorios.has(c.id) ? " · Con laboratorio" : ""}</small><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
+  return `<button class="card estado-${normalizar(st).replace(" ","-")}" data-${paraPlan ? "elegir" : "curso"}="${c.id}" ${limitado ? "disabled" : ""}><span class="meta">SEM ${c.semester} · ${c.id} · ${c.credits} CLAR</span><strong>${c.name}</strong><small class="tipo">${tipoCurso(c.id)}${esVacaciones ? " · "+etiquetaHoras(c.id,contexto.indiceVac)+" · "+estadoOferta(c.id,contexto.indiceVac) : ""}${s.labsGanados.includes(c.id) ? " · Laboratorio ganado" : tieneLaboratorio(c.id) ? " · Con laboratorio" : ""}</small><span class="pill ${normalizar(st).replace(" ","-")}">${etiqueta}</span>${pista}${abre ? "<small class='impacto'>Al aprobarlo abres "+abre+(abre === 1 ? " curso" : " cursos")+"</small>" : ""}</button>`;
 }
 function mapa() {
   const q = normalizar($("buscar").value.trim()), f = $("filtro").value;
-  const visibles = cursos.filter(c => (!$("soloLabs").checked || laboratorios.has(c.id)) && normalizar(c.name+" "+c.id).includes(q) && (!f || estado(c,s) === f));
+  const visibles = cursos.filter(c => (!$("soloLabs").checked || tieneLaboratorio(c.id)) && normalizar(c.name+" "+c.id).includes(q) && (!f || estado(c,s) === f));
   function porSemestre(lista, malla = false) {
     return semestres.map(n => {
       const grupo = lista.filter(c => c.semester === n);
@@ -124,7 +124,7 @@ function grafo(c) {
       const otros = faltantes(curso,s).filter(r => r !== c.id);
       nota = otros.length ? "También falta: "+otros.join(", ") : "Se abre al aprobar "+c.id;
     }
-    return `<button class="nodo estado-${normalizar(st).replace(" ","-")}" style="left:${p.x}rem;top:${p.y}rem" data-nodo="${id}" ${id===c.id ? "disabled" : ""}><small>${id} · Sem. ${curso.semester}${id === c.id ? " · Seleccionado" : ""}</small><b>${curso.name}</b><span class="tipoNodo">${tipoCurso(id)}${laboratorios.has(id) ? " · Lab." : ""}</span><small>${nota}</small></button>`;
+    return `<button class="nodo estado-${normalizar(st).replace(" ","-")}" style="left:${p.x}rem;top:${p.y}rem" data-nodo="${id}" ${id===c.id ? "disabled" : ""}><small>${id} · Sem. ${curso.semester}${id === c.id ? " · Seleccionado" : ""}</small><b>${curso.name}</b><span class="tipoNodo">${tipoCurso(id)}${tieneLaboratorio(id) ? " · Lab." : ""}</span><small>${nota}</small></button>`;
   }).join("");
   return `<h3>Grafo de cursos</h3><p>Las flechas conectan cada prerrequisito con el curso que lo necesita. Cada columna corresponde a un semestre.</p><label>Mostrar <select id="modoGrafo">${[["ruta","Ruta completa"],["directa","Conexiones directas"],["pensum","Pénsum completo"]].map(([valor,nombre]) => `<option value="${valor}" ${valor===modoGrafo ? "selected" : ""}>${nombre}</option>`).join("")}</select></label> <button data-ajustar>Ver todo el grafo</button><div class="grafo" role="region" aria-label="Grafo de prerrequisitos y cursos posteriores" tabindex="0"><div style="width:${ancho}rem;height:${alto}rem"><svg aria-hidden="true" viewBox="0 0 ${ancho} ${alto}" preserveAspectRatio="none"><defs><marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><polygon points="0,0 10,5 0,10" fill="#596779"/></marker></defs>${lineas}</svg>${tarjetas}</div></div>`;
 }
@@ -138,7 +138,7 @@ function detalle(id) {
   const directos = st === "Bloqueado" ? faltantes(c,s).map(r => catalogo.get(r)) : [];
   const previos = directos.length ? rutaPendiente(c,s).filter(x => !c.req.includes(x.id)) : [];
 
-  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${st} · ${tipoCurso(id)}</p>${infoLab}${["0799","7999"].includes(id) ? "<p>Para el cierre debes aprobar uno de los dos seminarios de investigación según tu modalidad de graduación.</p>" : ""}${directos.length ? "<h3>Te falta aprobar</h3><ul>"+enlaces(directos)+"</ul>" : ""}${previos.length ? "<h3>Clases previas pendientes</h3><ol>"+enlaces(previos)+"</ol>" : ""}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>${grafo(c)}`;
+  $("contenido").innerHTML = `<span class="eyecode">CURSO ${id} · SEMESTRE ${c.semester}</span><h2 id="tituloCurso">${c.name}</h2><p>${c.credits} CLAR · ${st} · ${tipoCurso(id)}</p>${lab || !tieneLaboratorio(id) ? infoLab : ""}${tieneLaboratorio(id) ? controlLaboratorio(id) : ""}${["0799","7999"].includes(id) ? "<p>Para el cierre debes aprobar uno de los dos seminarios de investigación según tu modalidad de graduación.</p>" : ""}${directos.length ? "<h3>Te falta aprobar</h3><ul>"+enlaces(directos)+"</ul>" : ""}${previos.length ? "<h3>Clases previas pendientes</h3><ol>"+enlaces(previos)+"</ol>" : ""}<h3>Mi registro</h3><div class="actions">${["Pendiente","En curso","Aprobado"].map(v => `<button data-estado="${v}" aria-pressed="${(s.estados[id] || "Pendiente") === v}">${v}</button>`).join("")}</div>${grafo(c)}`;
   $("detalle").setAttribute("aria-labelledby","tituloCurso");
   if (!$("detalle").open) $("detalle").showModal();
   const region = $("contenido").querySelector(".grafo");
