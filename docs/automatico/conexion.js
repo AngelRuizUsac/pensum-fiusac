@@ -17,6 +17,8 @@ if(window.parent!==window && document.referrer && new URL(document.referrer).ori
     let config={};
     try{config=JSON.parse(localStorage.getItem("nhc")||"{}")||{};}catch{}
     const ganados=new Set(perfil.labsGanados);
+    window.labsGanadosDelPerfil = [...ganados];
+    window.actualizarLaboratorioDelPerfil = (id, ganado) => parent.actualizarLaboratorioGanado(id, ganado);
     const firma=JSON.stringify([...ganados].sort());
     if((config.labsGanadosFIUSAC||"[]")!==firma){
       config.miHorario=null;config.vista=null;
@@ -25,12 +27,13 @@ if(window.parent!==window && document.referrer && new URL(document.referrer).ori
     const favoritas=new Set(perfil.preferidas);
     window.ordenarPorPreferencia=datos=>{
       for(const c of datos.cursos||[]){
-        c.secciones=c.secciones.filter(fila=>{
+        c.secciones.forEach(fila=>{
           const tipo=parent.tipoComponente(fila.categoria);
           if(tipo==="Laboratorio") parent.registrarLaboratorioOfertado(c.codigo);
           fila.categoria=tipo==="Teoría"?null:tipo==="Trabajo dirigido"?"Trabajo Dirigido":tipo;
-          return tipo!=="Laboratorio" || !ganados.has(c.codigo);
+
         });
+        c.componentes_practicos=[...new Set(c.secciones.map(fila=>fila.categoria).filter(Boolean))];
         const preferida=k=>favoritas.has(c.codigo+"/"+(k.categoria==="Trabajo Dirigido"?"Trabajo dirigido":k.categoria||"Teoría")+"/"+k.seccion);
         c.secciones.sort((a,b)=>Number(preferida(b))-Number(preferida(a)));
       }

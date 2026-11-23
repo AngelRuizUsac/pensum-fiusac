@@ -6,13 +6,17 @@ const esbuild=require(require.resolve("esbuild",{paths:[deps,web,process.cwd()]}
 const paquete="https://esm.sh/@mlc-ai/web-llm@0.2.84";
 const base={bundle:true,format:"esm",target:"es2022",jsx:"automatic",minify:true,legalComments:"eof",nodePaths:[deps],alias:{"@":path.join(web,"src")},define:{"process.env.NODE_ENV":'"production"'},plugins:[{name:"adaptar-pages",setup(build){
   build.onResolve({filter:/^@mlc-ai\/web-llm$/},()=>({path:paquete,external:true}));
-  build.onLoad({filter:/[\\/](PanelPerfil|App)\.tsx$/},({path:archivo})=>{
+  build.onLoad({filter:/[\\/](PanelPerfil|PanelCursos|App)\.tsx$/},({path:archivo})=>{
     let src=fs.readFileSync(archivo,"utf8");
     if(path.basename(archivo)==="PanelPerfil.tsx"){
       const ancla='      </div>\n\n      <label className="check-linea"';
       src=src.replace(/\r\n/g,"\n");
       if(!src.includes(ancla)) throw Error("Cambió la tarjeta de perfil.");
       src='import ElegirPlan from '+JSON.stringify(path.resolve(__dirname,"ElegirPlan.tsx"))+';\n'+src.replace(ancla,'        {window.integrado && <ElegirPlan/>}\n'+ancla);
+    }else if(path.basename(archivo)==="PanelCursos.tsx"){
+      src='import {createElement} from "react"; import {guardarLocal, touch} from "@/lib/cliente/estado";\n'+src
+        .replace("const curso = E.porCodigo.get(codigo);", "const original = E.porCodigo.get(codigo); const curso = laboratoriosAutomaticos.paraHorario(original);")
+        .replace("{restringidas.length > 0 && (", "{laboratoriosAutomaticos.control(createElement, original, E, guardarLocal, touch)}{restringidas.length > 0 && (");
     }else{
       src=src.replace('<PanelCursos />','{window.integrado ? <details className="panel cursos-plegables"><summary>Cursos y secciones</summary><PanelCursos /></details> : <PanelCursos />}');
     }
@@ -21,6 +25,7 @@ const base={bundle:true,format:"esm",target:"es2022",jsx:"automatic",minify:true
   build.onLoad({filter:/[\\/]cliente[\\/](acciones|compartir|ia[\\/]motor)\.ts$|[\\/]Modales\.tsx$/},({path:archivo})=>{
     let src=fs.readFileSync(archivo,"utf8").replaceAll('fetch(`/api/','window.apiHorario(`/api/').replaceAll('fetch("/api/','window.apiHorario("/api/').replaceAll('${location.origin}/#','${location.origin}${location.pathname}#').replaceAll('./webllm.worker.ts','./worker.js').replaceAll('src="/icons/','src="https://no-hay-cupo.vercel.app/icons/').replaceAll('src="/rago.jpg"','src="https://no-hay-cupo.vercel.app/rago.jpg"');
     src=src.replace("E.catalogo = data;","window.ordenarPorPreferencia?.(data); E.catalogo = data;");
+    src=src.replace("catalogo: E.catalogo,", "catalogo: {...E.catalogo, cursos:E.catalogo.cursos.map(laboratoriosAutomaticos.paraHorario)},");
     // El límite académico viene del perfil FIUSAC que abrió esta vista.
     src=src.replace("E.semestre = valor;","E.semestre = valor; window.notificarPeriodo?.(valor);");
     for(const nombre of ["generar(topN = E.topN)","generarConsulta()"]){

@@ -64,8 +64,9 @@ function dibujarHorario() {
   const q=normalizar($("filtroHorario").value.trim()), dia=$("diaHorario").value;
   const perfil=perfilDelHorario();
   const modalidad=$("modalidadHorario").value.toUpperCase();
-  const filas=ofertaVista.secciones.filter(x=>(!modalidad || x.bloques.some(b=>b.lugar.toUpperCase().split(/[^A-Z]+/).includes(modalidad))) && (!$("soloElegibles").checked || elegible(catalogo.get(x.id),perfil) || perfil.estados[x.id]==="En curso") && normalizar([catalogo.get(x.id).name,x.clave,...x.bloques.flatMap(b=>[b.docente,b.auxiliar])].join(" ")).includes(q) && (!dia || x.bloques.some(b=>b.dias.includes(dia))));
-  const nombre=x=>escHorario(x.id+" · "+catalogo.get(x.id).name+" · "+x.tipo+" "+(x.sec||"sin sección"));
+  const tipo=$("tipoHorario").value;
+  const filas=ofertaVista.secciones.filter(x=>(!tipo || x.tipo===tipo) && (!modalidad || x.bloques.some(b=>b.lugar.toUpperCase().split(/[^A-Z]+/).includes(modalidad))) && (!$("soloElegibles").checked || elegible(catalogo.get(x.id),perfil) || perfil.estados[x.id]==="En curso") && normalizar([catalogo.get(x.id).name,x.clave,...x.bloques.flatMap(b=>[b.docente,b.auxiliar])].join(" ")).includes(q) && (!dia || x.bloques.some(b=>b.dias.includes(dia))));
+  const nombre=x=>escHorario(x.id+" · "+catalogo.get(x.id).name+" · "+(x.tipo==="Teoría"?"Magistral":x.tipo)+" "+(x.sec||"sin sección"));
   const boton=(x,t,des=false)=>'<button data-seccion="'+escHorario(x.clave)+'" '+(des?"disabled":"")+'>'+escHorario(t)+'</button>';
   const tarjetaSeccion=x=>{
     const dentro=elegidas.has(x.clave), razon=dentro?"":razonHorario(x,seleccion);
@@ -94,14 +95,18 @@ $("diaHorario").onchange=dibujarHorario;
 $("soloElegibles").onchange=dibujarHorario;
 $("diaHorario").innerHTML+=Object.entries(diasSemana).map(([id,d])=>'<option value="'+id+'">'+d+'</option>').join("");
 
-document.addEventListener("change",e=>{
-  const id=e.target.dataset.labGanado;
-  if(!id || !catalogo.has(id)) return;
+function actualizarLaboratorioGanado(id, ganado){
+  if(!catalogo.has(id)) return;
   s.labsGanados=s.labsGanados.filter(codigo=>codigo!==id);
-  if(e.target.checked) s.labsGanados.push(id);
+  if(ganado) s.labsGanados.push(id);
   guardar();
   cancelarComparacion();
   dibujarHorario();
   if($("detalle").open) detalle(id);
+}
+document.addEventListener("change",e=>{
+  const id=e.target.dataset.labGanado;
+  if(!id || !catalogo.has(id)) return;
+  actualizarLaboratorioGanado(id,e.target.checked);
   if($("originalHorario").hasAttribute("src")) abrirOriginal(true);
 });

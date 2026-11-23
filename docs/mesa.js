@@ -18,6 +18,7 @@ $("modoAuto").onclick=()=>cambiarModo(true);
 $("abrirCatalogo").onclick=()=>$("drawerCatalogo").showModal();
 for(const boton of document.querySelectorAll("[data-cerrar]")) boton.onclick=()=>$(boton.dataset.cerrar).close();
 $("modalidadHorario").onchange=dibujarHorario;
+$("tipoHorario").onchange=dibujarHorario;
 function agruparCatalogo(filas,tarjeta){
   const abiertos=new Set([...$("secciones").querySelectorAll("details[open]")].map(d=>d.dataset.grupo));
   const grupos=new Map();
@@ -126,7 +127,7 @@ function abrirOriginal(forzar=false){
   const marco=$("originalHorario"),periodo=codigoPeriodoOriginal();
   if(!marco.hasAttribute("src") || periodo!==ultimoPeriodoOriginal || forzar){
     if(!marco.hasAttribute("src") && cursosParaOriginal===null && deseados.size)cursosParaOriginal=[...deseados];
-    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=20";
+    ultimoPeriodoOriginal=periodo;marco.src="automatico/index.html?v=21";
   }
 }
 function iniciarOriginalCon(ids){cursosParaOriginal=ids;abrirOriginal(true);}
